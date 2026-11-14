@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.1.4",
-  "description": "Run multiple coding-agent CLIs in parallel with task queues, isolated worktrees, handoffs, and live status.",
+  "version": "0.2.0",
+  "description": "Run Claude Code, Codex and Antigravity CLIs in parallel git worktrees with task queues, dependencies, acceptance checks and a live status dashboard.",
   "type": "module",
   "bin": {
     "multi-agent-workbench": "bin/maw.mjs",
@@ -15,7 +15,8 @@
   ],
   "scripts": {
     "start": "node bin/maw.mjs",
-    "check": "node --check bin/maw.mjs && node --check multi-agent-workbench/scripts/supervisor.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check bin/maw.mjs && for f in multi-agent-workbench/scripts/*.mjs; do node --check $f || exit 1; done",
     "pack:check": "npm pack --dry-run"
   },
   "engines": {
@@ -30,7 +31,14 @@
     "url": "https://github.com/ruhul0/multi-agent-workbench/issues"
   },
   "homepage": "https://github.com/ruhul0/multi-agent-workbench#readme",
-  "dependencies": {
-    "multi-agent-workbench": "github:ruhul0/multi-agent-workbench"
-  }
+  "keywords": [
+    "ai",
+    "agents",
+    "claude",
+    "codex",
+    "antigravity",
+    "multi-agent",
+    "git-worktree",
+    "cli"
+  ]
 }

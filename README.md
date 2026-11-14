@@ -1,57 +1,90 @@
 # Multi-Agent Workbench
 
-Run multiple coding-agent CLIs in parallel with isolated worktrees, micro-task queues, handoff history, and live status.
+Run Claude Code, Codex and Antigravity CLIs in parallel. Each agent works in its own git worktree, takes small tasks from its own queue, and reports commits, check results and output to a live status file and dashboard.
+
+> **Warning:** `maw` starts agents with their permission prompts disabled (`--dangerously-skip-permissions`, `--dangerously-bypass-approvals-and-sandbox`). They can run any command as your user. Only use it on repositories and machines where that is acceptable, and review every commit before merging.
+
+## Requirements
+
+- Node.js 20 or newer
+- A git repository with at least one commit
+- At least one agent CLI, logged in: [`claude`](https://docs.claude.com/en/docs/claude-code), [`codex`](https://github.com/openai/codex) or `agy` (Antigravity)
 
 ## Quick start
 
-Create `tasks.json` in your project:
+```bash
+npm install -g multi-agent-workbench
+cd your-project
+maw init            # writes a starter tasks.json
+# edit tasks.json
+maw doctor          # are the agents installed and logged in?
+maw run --dry-run   # validate the plan
+maw                 # run it
+maw dashboard       # in another terminal: http://127.0.0.1:4317
+```
+
+Without installing: `npx multi-agent-workbench <command>`.
+
+## tasks.json
 
 ```json
 [
-  {"id":"L1","owner":"claude","command":"claude","worktree":"../project-claude","task":"API task","prompt":"Implement the API task and commit it."},
-  {"id":"C1","owner":"codex","command":"codex","worktree":"../project-codex","task":"Frontend task","prompt":"Implement the frontend task and commit it."},
-  {"id":"A1","owner":"antigravity","command":"agy","worktree":"../project-agy","task":"QA task","prompt":"Audit the current changes, fix only clear issues, and commit them."}
+  { "id": "L1", "owner": "claude", "task": "Orders API", "prompt": "Add GET /api/orders with pagination. Run the API tests and commit.", "check": "npm test -- orders" },
+  { "id": "C1", "owner": "codex", "task": "Orders page", "prompt": "Build the orders page. Run lint and commit." },
+  { "id": "A1", "owner": "antigravity", "command": "agy", "task": "QA", "depends_on": ["L1", "C1"], "prompt": "Merge maw/claude and maw/codex into this branch, run all tests, fix only clear bugs, and commit." }
 ]
 ```
 
-Install and run:
+- Each **owner** has a queue. Queues run in parallel; tasks in one queue run in order.
+- Each owner gets a worktree at `../<repo>-<owner>` on branch `maw/<owner>`, created automatically. Override with `worktree`, `branch` and `base`.
+- `depends_on` waits for other tasks; if one fails, dependents are skipped.
+- `check` is a shell command run after the agent finishes. If it fails, the task is blocked.
+- If a task is blocked, the rest of that owner's queue is skipped.
+- `model`, `effort` and `timeout_minutes` can be set per task (or with `CLAUDE_MODEL`, `CODEX_MODEL`, `AGY_MODEL` and the matching `*_EFFORT` env vars).
+
+Full field reference: [`multi-agent-workbench/references/task-schema.md`](multi-agent-workbench/references/task-schema.md).
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `maw init [--force]` | Create a starter `tasks.json`. Won't overwrite without `--force`. |
+| `maw doctor` | Check the agents used in `tasks.json` (or all agents) are installed and logged in. Exits 1 if any are not. Never prints account details. |
+| `maw` / `maw run` | Run the queues. Exits 0 only if every task is done. `--dry-run` validates and prints the plan. |
+| `maw status` | Summarize the last run. |
+| `maw dashboard [--port N]` | Live status page on localhost (agents, tasks, commits, recent output). |
+| `maw install-skill` | Install the planning skill for Codex and Claude Code (`--codex` / `--claude` for one). |
+
+All commands accept `--tasks <file>` to use a different task file.
+
+## Output
+
+- `.agent-workbench/status.json`: every task's state, real commit (read from git, not guessed from output), new commits, uncommitted changes, check result and last 30 lines of output
+- `.agent-workbench/logs/<id>.log`: full output per task
+- `.agent-workbench/supervisor.log`: event log
+
+Add `.agent-workbench/` to your project's `.gitignore`.
+
+## Use as a skill
+
+The skill tells a coordinating agent how to plan micro-tasks, write `tasks.json`, run `maw` and review the results.
 
 ```bash
-npm install -g multi-agent-workbench
-multi-agent-workbench init
-# edit tasks.json for your project
-multi-agent-workbench doctor
-multi-agent-workbench
-# or without installing
-npx multi-agent-workbench init
-npx multi-agent-workbench
+maw install-skill
 ```
 
-The supervisor reads `tasks.json` from the current project and writes `.agent-workbench/status.json` and `.agent-workbench/supervisor.log`. Review each commit before merging or deploying.
+This copies the skill to `~/.codex/skills/multi-agent-workbench` and `~/.claude/skills/multi-agent-workbench`. Then ask:
 
-## Use as a Codex skill
+- Codex: `Use $multi-agent-workbench to split this into micro-tasks: frontend to Codex, backend to Claude, QA to Antigravity.`
+- Claude Code: `/multi-agent-workbench split this into micro-tasks …`
 
-Clone the repository into your Codex skills directory:
+## Development
 
 ```bash
-git clone https://github.com/ruhul0/multi-agent-workbench.git \
-  ~/.codex/skills/multi-agent-workbench
+npm test        # end-to-end tests with a fake agent CLI
+npm run check   # syntax check
 ```
 
-Then invoke it in a Codex task with:
+## License
 
-```text
-Use $multi-agent-workbench to split this project into micro-tasks, assign frontend work to Codex, backend work to Claude, QA to Antigravity, and report live progress.
-```
-
-The skill instructions are in `multi-agent-workbench/SKILL.md`. The Node.js CLI and the skill are independent: use the skill for planning/orchestration guidance, and use `maw` to launch workers.
-
-## Agent login check
-
-Before assigning work, run:
-
-```bash
-maw doctor
-```
-
-It checks whether `claude`, `codex`, and `agy` are available without printing credentials.
+MIT

@@ -1,9 +1,71 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Multi-Agent Workbench</title>
-<style>body{font:16px system-ui;max-width:820px;margin:60px auto;padding:0 20px;line-height:1.6;color:#17202a}code,pre{background:#f1f3f5;border-radius:6px;padding:.15em .35em}pre{padding:16px;overflow:auto}a{color:#075985}</style>
-<h1>Multi-Agent Workbench</h1><p>Run Claude, Codex, and other coding agents in parallel with isolated worktrees, micro-task queues, handoffs, and live status.</p>
-<h2>Install</h2><pre>npm install -g multi-agent-workbench
-multi-agent-workbench init
-multi-agent-workbench</pre>
-<h2>What it provides</h2><ul><li>Independent agent queues</li><li>Git worktree isolation</li><li>Commit and test handoffs</li><li>Live status and output history</li><li>Review gates before merge or deploy</li></ul>
-<h2>Use as a skill</h2><pre>git clone https://github.com/ruhul0/multi-agent-workbench.git ~/.codex/skills/multi-agent-workbench</pre><p>Then ask Codex: <code>Use $multi-agent-workbench to divide this project into micro-tasks and assign them to Codex, Claude, and Antigravity.</code></p>
-<p><a href="https://github.com/ruhul0/multi-agent-workbench">View the source on GitHub</a> · <a href="https://www.npmjs.com/package/multi-agent-workbench">Install from npm</a></p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multi-Agent Workbench</title>
+<meta name="description" content="Run Claude Code, Codex and Antigravity CLIs in parallel git worktrees with task queues, dependencies, acceptance checks and a live dashboard.">
+<style>
+:root{--bg:#fbfbf9;--fg:#1b1d21;--muted:#5d6168;--code:#eff1f3;--line:#e2e4e7;--link:#075985;--warn-bg:#fff6e5;--warn-line:#e7b54a}
+@media (prefers-color-scheme:dark){:root{--bg:#121315;--fg:#e8e9eb;--muted:#a1a5ab;--code:#1f2125;--line:#30333a;--link:#7cc4f0;--warn-bg:#2a2210;--warn-line:#9b7a2c}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif}
+main{max-width:820px;margin:0 auto;padding:48px 16px}
+h1{font-size:2rem;margin:0 0 .25em}h2{margin-top:2em}
+p.lead{color:var(--muted);font-size:1.1rem}
+code,pre{background:var(--code);border-radius:6px;font-size:.9em}code{padding:.1em .35em}pre{padding:14px 16px;overflow:auto}
+a{color:var(--link)}
+.warn{background:var(--warn-bg);border-left:4px solid var(--warn-line);padding:10px 14px;border-radius:4px}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.wrap{overflow-x:auto}
+</style>
+</head>
+<body><main>
+<h1>Multi-Agent Workbench</h1>
+<p class="lead">Run Claude Code, Codex and Antigravity in parallel. Each agent gets its own git worktree and task queue; you get real commits, check results and a live dashboard.</p>
+
+<h2>Install</h2>
+<pre>npm install -g multi-agent-workbench
+cd your-project
+maw init          # starter tasks.json
+maw doctor        # agents installed and logged in?
+maw               # run the queues
+maw dashboard     # http://127.0.0.1:4317</pre>
+<p class="warn"><strong>Warning:</strong> agents run with permission prompts disabled inside their worktrees. Use it only where that is acceptable, and review every commit before merging.</p>
+
+<h2>What it does</h2>
+<ul>
+<li>One queue per owner; queues run in parallel, tasks in a queue run in order</li>
+<li>Worktrees and branches (<code>maw/&lt;owner&gt;</code>) created automatically</li>
+<li><code>depends_on</code> between tasks across agents</li>
+<li><code>check</code> commands that must pass for a task to count as done</li>
+<li>Commits read from git, plus uncommitted-change detection</li>
+<li>Status file, per-task logs and a live local dashboard</li>
+</ul>
+
+<h2>tasks.json</h2>
+<pre>[
+  { "id": "L1", "owner": "claude", "task": "Orders API",
+    "prompt": "Add GET /api/orders. Run tests and commit.", "check": "npm test -- orders" },
+  { "id": "C1", "owner": "codex", "task": "Orders page",
+    "prompt": "Build the orders page. Run lint and commit." },
+  { "id": "A1", "owner": "antigravity", "command": "agy", "depends_on": ["L1", "C1"],
+    "prompt": "Merge maw/claude and maw/codex, run all tests, fix clear bugs, commit." }
+]</pre>
+
+<h2>Commands</h2>
+<div class="wrap"><table>
+<tr><td><code>maw init</code></td><td>Create a starter <code>tasks.json</code></td></tr>
+<tr><td><code>maw doctor</code></td><td>Check agents are installed and logged in (exit 1 if not)</td></tr>
+<tr><td><code>maw run [--dry-run]</code></td><td>Run, or validate and print the plan</td></tr>
+<tr><td><code>maw status</code></td><td>Summarize the last run</td></tr>
+<tr><td><code>maw dashboard</code></td><td>Live status page on localhost</td></tr>
+<tr><td><code>maw install-skill</code></td><td>Install the planning skill for Codex and Claude Code</td></tr>
+</table></div>
+
+<h2>Use as a skill</h2>
+<pre>maw install-skill</pre>
+<p>Then in Codex: <code>Use $multi-agent-workbench to split this into micro-tasks for Codex, Claude and Antigravity.</code> In Claude Code: <code>/multi-agent-workbench</code>.</p>
+
+<p><a href="https://github.com/ruhul0/multi-agent-workbench">Source on GitHub</a> · <a href="https://www.npmjs.com/package/multi-agent-workbench">npm package</a></p>
+</main></body>
+</html>

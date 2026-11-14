@@ -1,46 +1,114 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
-import { spawnSync } from "node:child_process";
-import process from "node:process";
+import { writeFile, readFile, cp, mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
-import { writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import process from "node:process";
+import { runWorkbench } from "../multi-agent-workbench/scripts/supervisor.mjs";
+import { doctor } from "../multi-agent-workbench/scripts/doctor.mjs";
+import { dashboard } from "../multi-agent-workbench/scripts/dashboard.mjs";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const supervisor = resolve(packageRoot, "multi-agent-workbench/scripts/supervisor.mjs");
-const command = process.argv[2];
-if (command === "--help" || command === "-h") {
-  console.log("multi-agent-workbench — run Claude and Codex tasks in parallel");
-  console.log("\nCommands:\n  maw init    Create a starter tasks.json\n  maw doctor Check agent CLIs and authentication\n  maw         Run the task queue in the current project");
-  process.exit(0);
-}
-if (command === "doctor") {
-  const checks = [
-    ["claude", ["auth", "status"]],
-    ["codex", ["login", "status"]],
-    ["agy", ["--help"]],
-  ];
-  for (const [name, args] of checks) {
-    const result = spawnSync(name, args, { encoding: "utf8", timeout: 10000 });
-    const installed = !result.error;
-    const output = `${result.stdout || ""}${result.stderr || ""}`.replace(/token[^\n]*/gi, "token [redacted]").trim();
-    console.log(`${installed ? "✓" : "✗"} ${name}${installed ? ` — ${output.split("\n")[0] || "available"}` : " — not installed"}`);
+const HELP = `multi-agent-workbench (maw) — run Claude Code, Codex and Antigravity tasks in parallel git worktrees
+
+Usage:
+  maw init [--force]       Create a starter tasks.json in the current project
+  maw doctor               Check that the agents used in tasks.json are installed and logged in
+  maw run [--dry-run]      Run the task queue (default command). --dry-run validates and prints the plan
+  maw status               Print the latest .agent-workbench/status.json as a summary
+  maw dashboard [--port N] Serve a live status page on http://127.0.0.1:4317
+  maw install-skill        Install the planning skill for Codex and Claude Code
+                           (--codex or --claude to pick one)
+
+Options:
+  --tasks <file>           Use a different task file (default: tasks.json)
+  -h, --help               Show this help
+  -v, --version            Show the version
+
+Agents run with permission prompts disabled inside their worktrees. Review every commit before merging.`;
+
+const argv = process.argv.slice(2);
+const flag = (name) => argv.includes(name);
+const value = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
+const command = argv.find((a, i) => !a.startsWith("-") && !["--tasks", "--port"].includes(argv[i - 1])) || "run";
+const taskPath = value("--tasks");
+
+async function main() {
+  if (flag("-h") || flag("--help") || command === "help") { console.log(HELP); return 0; }
+  if (flag("-v") || flag("--version")) {
+    const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+    console.log(pkg.version);
+    return 0;
   }
-  process.exit(0);
+  switch (command) {
+    case "init": return init();
+    case "doctor": return (await doctor({ taskPath })) ? 0 : 1;
+    case "run": {
+      const { ok } = await runWorkbench({ taskPath, dryRun: flag("--dry-run") });
+      return process.exitCode === 130 ? 130 : ok ? 0 : 1;
+    }
+    case "status": return status();
+    case "install-skill": return installSkill();
+    case "dashboard": {
+      const port = Number(value("--port") || 4317);
+      if (!Number.isInteger(port) || port <= 0) throw new Error("--port must be a positive integer");
+      dashboard({ port });
+      return null; // keep the server running
+    }
+    default:
+      console.error(`Unknown command "${command}".\n\n${HELP}`);
+      return 2;
+  }
 }
-if (command === "init") {
-  const target = resolve(process.cwd(), "tasks.json");
-  await writeFile(target, JSON.stringify([
-    { id: "L1", owner: "claude", command: "claude", worktree: "../project-claude", task: "Backend task", prompt: "Implement the backend task and commit it." },
-    { id: "C1", owner: "codex", command: "codex", worktree: "../project-codex", task: "Frontend task", prompt: "Implement the frontend task and commit it." },
-    { id: "A1", owner: "antigravity", command: "agy", worktree: "../project-agy", task: "QA task", prompt: "Audit the current changes, fix only clear issues, and commit them." }
-  ], null, 2) + "\n", { flag: "wx" });
-  console.log(`Created ${target}. Edit it, then run maw.`);
-  process.exit(0);
+
+async function init() {
+  const target = resolve(process.cwd(), taskPath || "tasks.json");
+  if (existsSync(target) && !flag("--force")) {
+    console.error(`${target} already exists. Edit it, or run \`maw init --force\` to overwrite it.`);
+    return 1;
+  }
+  const tasks = [
+    { id: "L1", owner: "claude", command: "claude", task: "Backend task", prompt: "Implement the backend task, run its tests, and commit the result." },
+    { id: "C1", owner: "codex", command: "codex", task: "Frontend task", prompt: "Implement the frontend task, run its tests, and commit the result." },
+    { id: "A1", owner: "antigravity", command: "agy", task: "QA task", depends_on: ["L1", "C1"], prompt: "Review the latest changes on this branch, fix only clear issues, and commit them." },
+  ];
+  await writeFile(target, JSON.stringify(tasks, null, 2) + "\n");
+  console.log(`Created ${target}.\nEdit the prompts, then run \`maw doctor\` and \`maw\`.`);
+  return 0;
 }
-const child = spawn(process.execPath, [supervisor, ...process.argv.slice(2)], {
-  cwd: process.cwd(),
-  stdio: "inherit",
-  env: process.env,
-});
-child.on("exit", (code, signal) => process.exit(signal ? 1 : (code ?? 1)));
+
+async function installSkill() {
+  const source = fileURLToPath(new URL("../multi-agent-workbench", import.meta.url));
+  const targets = [];
+  if (!flag("--claude")) targets.push(resolve(homedir(), ".codex/skills/multi-agent-workbench"));
+  if (!flag("--codex")) targets.push(resolve(homedir(), ".claude/skills/multi-agent-workbench"));
+  for (const target of targets) {
+    await mkdir(resolve(target, ".."), { recursive: true });
+    await cp(source, target, { recursive: true, force: true });
+    console.log(`Installed skill to ${target}`);
+  }
+  console.log("Invoke it with $multi-agent-workbench in Codex or /multi-agent-workbench in Claude Code.");
+  return 0;
+}
+
+async function status() {
+  const path = resolve(process.cwd(), ".agent-workbench/status.json");
+  let s;
+  try { s = JSON.parse(await readFile(path, "utf8")); } catch {
+    console.error("No status yet. Run `maw` in this project first.");
+    return 1;
+  }
+  console.log(`${s.finished ? "Finished" : "Running"} · updated ${s.updated_at}`);
+  for (const t of s.tasks || []) {
+    console.log(`${t.state.padEnd(8)} ${t.id.padEnd(8)} ${t.owner.padEnd(12)} ${(t.commit || "—").padEnd(12)} ${t.task}${t.reason ? `  (${t.reason})` : ""}`);
+  }
+  return 0;
+}
+
+try {
+  const code = await main();
+  if (code !== null) process.exitCode = code;
+} catch (error) {
+  console.error(`maw: ${error.message}`);
+  process.exitCode = 2;
+}
