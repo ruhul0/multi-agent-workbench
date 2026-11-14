@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/multi-agent-workbench/tasks.schema.json",
+  "plan": { "title": "Orders feature", "summary": "Orders API with pagination, an orders page against it, then a QA pass over both.", "source": "examples/PLAN.md" },
+  "max_parallel": 3,
+  "budget_usd": 15,
+  "tasks": [
+    { "id": "L1", "owner": "claude", "task": "Orders API", "prompt": "Add GET /api/orders returning the signed-in customer's orders, newest first, with cursor pagination (20 per page). Add API tests. Run the relevant tests and commit your changes with a clear message.", "check": "npm test -- orders", "retries": 1 },
+    { "id": "C1", "owner": "codex", "task": "Orders page", "prompt": "Build an Orders page that lists the customer's orders using the existing API client, loads more on scroll, and shows an empty state. Run lint and the relevant tests, and commit your changes with a clear message.", "check": "npm run lint", "retries": 1 },
+    { "id": "A1", "owner": "antigravity", "command": "agy", "task": "QA pass", "depends_on": ["L1", "C1"], "prompt": "Merge branches maw/claude and maw/codex into this branch. Run the full test suite, fix only clear bugs, and commit your changes with a clear message.", "check": "npm test" }
+  ]
+}

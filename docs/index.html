@@ -32,45 +32,53 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--li
 <h2>Install</h2>
 <pre>npm install -g multi-agent-workbench
 cd your-project
-maw init          # starter tasks.json
+maw plan PLAN.md  # split your plan into micro-tasks and assign agents
 maw doctor        # agents installed and logged in?
-maw               # run; live dashboard opens in your browser</pre>
+maw               # run; live dashboard opens in your browser
+maw review        # what each agent did
+maw merge --check "npm test"   # merge finished work into maw/integration</pre>
 <p class="warn"><strong>Warning:</strong> agents run with permission prompts disabled inside their worktrees. Use it only where that is acceptable, and review every commit before merging.</p>
 
 <h2>What it does</h2>
 <ul>
-<li>One queue per owner; queues run in parallel, tasks in a queue run in order</li>
-<li>Worktrees and branches (<code>maw/&lt;owner&gt;</code>) created automatically</li>
-<li><code>depends_on</code> between tasks across agents</li>
-<li><code>check</code> commands that must pass for a task to count as done</li>
-<li>Commits read from git, plus uncommitted-change detection</li>
-<li>Live dashboard opens automatically: agents, tasks, commits and output</li>
-<li>Status file and per-task logs</li>
+<li><code>maw plan</code> turns your plan into small tasks, each with an owner, a prompt, a check and dependencies</li>
+<li>One queue and worktree per agent; queues run in parallel, isolated tasks alongside</li>
+<li>Failed checks go back to the agent, which continues its session and tries again</li>
+<li>Live dashboard: each agent's output, current task and what's next, every commit with its diff, changed files and cost</li>
+<li><code>maw review</code>, <code>maw merge</code> and <code>maw clean</code> to integrate and tidy up</li>
+<li>Claude Code, Codex, Antigravity, or any CLI you define</li>
+<li>Budgets, environment allowlists, sandbox wrappers and notifications</li>
 </ul>
 
 <h2>tasks.json</h2>
-<pre>[
-  { "id": "L1", "owner": "claude", "task": "Orders API",
-    "prompt": "Add GET /api/orders. Run tests and commit.", "check": "npm test -- orders" },
-  { "id": "C1", "owner": "codex", "task": "Orders page",
-    "prompt": "Build the orders page. Run lint and commit." },
-  { "id": "A1", "owner": "antigravity", "command": "agy", "depends_on": ["L1", "C1"],
-    "prompt": "Merge maw/claude and maw/codex, run all tests, fix clear bugs, commit." }
-]</pre>
+<pre>{
+  "plan": { "title": "Orders feature" },
+  "tasks": [
+    { "id": "L1", "owner": "claude", "task": "Orders API", "retries": 1,
+      "prompt": "Add GET /api/orders. Run tests and commit.", "check": "npm test -- orders" },
+    { "id": "C1", "owner": "codex", "task": "Orders page",
+      "prompt": "Build the orders page. Run lint and commit." },
+    { "id": "A1", "owner": "antigravity", "command": "agy", "depends_on": ["L1", "C1"],
+      "prompt": "Merge maw/claude and maw/codex, run all tests, fix clear bugs, commit." }
+  ]
+}</pre>
 
 <h2>Commands</h2>
 <div class="wrap"><table>
-<tr><td><code>maw init</code></td><td>Create a starter <code>tasks.json</code></td></tr>
+<tr><td><code>maw plan [PLAN.md]</code></td><td>Split a plan into micro-tasks and write <code>tasks.json</code></td></tr>
 <tr><td><code>maw doctor</code></td><td>Check agents are installed and logged in (exit 1 if not)</td></tr>
-<tr><td><code>maw run [--dry-run]</code></td><td>Run and open the dashboard, or validate and print the plan</td></tr>
-<tr><td><code>maw status</code></td><td>Summarize the last run</td></tr>
-<tr><td><code>maw dashboard</code></td><td>Reopen the status page for a finished run</td></tr>
-<tr><td><code>maw install-skill</code></td><td>Install the planning skill for Codex and Claude Code</td></tr>
+<tr><td><code>maw run</code></td><td>Run and open the dashboard (<code>--dry-run</code>, <code>--resume</code>, <code>--max-parallel</code>, <code>--notify</code>)</td></tr>
+<tr><td><code>maw status</code> / <code>maw review</code></td><td>Summarize the last run / each task's commits and changes</td></tr>
+<tr><td><code>maw merge</code></td><td>Merge finished work into an integration worktree and test it</td></tr>
+<tr><td><code>maw clean</code></td><td>Remove maw's worktrees and branches</td></tr>
+<tr><td><code>maw dashboard</code></td><td>Reopen the dashboard for a finished run</td></tr>
+<tr><td><code>maw install-skill</code></td><td>Install the coordinator skill for Codex and Claude Code</td></tr>
 </table></div>
 
-<h2>Use as a skill</h2>
-<pre>maw install-skill</pre>
-<p>Then in Codex: <code>Use $multi-agent-workbench to split this into micro-tasks for Codex, Claude and Antigravity.</code> In Claude Code: <code>/multi-agent-workbench</code>.</p>
+<h2>Use as a skill or plugin</h2>
+<pre>/plugin marketplace add ruhul0/multi-agent-workbench
+/plugin install multi-agent-workbench@multi-agent-workbench</pre>
+<p>Or <code>maw install-skill</code>, then in Codex: <code>Use $multi-agent-workbench to run PLAN.md across Codex, Claude and Antigravity.</code> In Claude Code: <code>/multi-agent-workbench</code>.</p>
 
 <p><a href="https://github.com/ruhul0/multi-agent-workbench">Source on GitHub</a> · <a href="https://www.npmjs.com/package/multi-agent-workbench">npm package</a></p>
 </main></body>

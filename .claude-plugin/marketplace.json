@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "multi-agent-workbench",
+  "owner": { "name": "ruhul0" },
+  "metadata": { "description": "Plan, split and run coding work across several agent CLIs in parallel git worktrees." },
+  "plugins": [
+    {
+      "name": "multi-agent-workbench",
+      "source": "./",
+      "description": "Turn a plan into micro-tasks and run them in parallel across Claude Code, Codex and Antigravity with a live dashboard.",
+      "version": "0.3.0",
+      "category": "development"
+    }
+  ]
+}

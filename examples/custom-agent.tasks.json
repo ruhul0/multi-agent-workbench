@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/multi-agent-workbench/tasks.schema.json",
+  "agents": {
+    "gemini": {
+      "label": "Gemini CLI",
+      "bin": "gemini",
+      "args": ["--yolo", ["--model", "{model}"], "-p", "{prompt}"],
+      "plan_args": ["-p", "{prompt}"],
+      "auth": null,
+      "login": "gemini"
+    }
+  },
+  "env": { "allow": ["GEMINI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"], "set": { "CI": "1" } },
+  "notify": { "desktop": true },
+  "tasks": [
+    { "id": "G1", "owner": "gemini", "task": "Docs pass", "prompt": "Update README.md to match the current CLI flags. Commit your changes with a clear message." },
+    { "id": "L1", "owner": "claude", "task": "Flaky test", "isolate": true, "prompt": "Find and fix the flaky test in test/api.test.js. Run it 5 times to confirm, then commit.", "check": "npm test -- api", "retries": 2 }
+  ]
+}

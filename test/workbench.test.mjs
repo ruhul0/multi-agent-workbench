@@ -5,9 +5,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeTasks } from "../multi-agent-workbench/scripts/tasks.mjs";
-import { formatClaudeEvent, formatCodexEvent, parseCodexEvent, parseClaudeEvent, expandTemplate, AGENTS } from "../multi-agent-workbench/scripts/agents.mjs";
-import { dashboard } from "../multi-agent-workbench/scripts/dashboard.mjs";
+import { normalizeTasks } from "../skills/multi-agent-workbench/scripts/tasks.mjs";
+import { formatClaudeEvent, formatCodexEvent, parseCodexEvent, parseClaudeEvent, expandTemplate, AGENTS } from "../skills/multi-agent-workbench/scripts/agents.mjs";
+import { dashboard } from "../skills/multi-agent-workbench/scripts/dashboard.mjs";
 import { request } from "node:http";
 import { spawn } from "node:child_process";
 
@@ -392,4 +392,15 @@ echo '{"type":"result","subtype":"success","session_id":"s1","total_cost_usd":1.
   assert.match(env, /MAW_TEST_SET=yes/);
   assert.match(env, /MAW_TASK_ID=L1/);
   assert.doesNotMatch(env, /MAW_TEST_SECRET/);
+});
+
+test("bundled examples and the starter file are valid", async () => {
+  const { parsePlan } = await import("../skills/multi-agent-workbench/scripts/tasks.mjs");
+  for (const f of ["orders.tasks.json", "custom-agent.tasks.json"]) {
+    const data = JSON.parse(await readFile(new URL(`../examples/${f}`, import.meta.url), "utf8"));
+    assert.ok(parsePlan(data, "/r/app").tasks.length > 0, f);
+  }
+  const { repo, agent } = await setup([{ id: "x", owner: "claude", prompt: "x" }]);
+  assert.equal(maw(repo, agent, "init", "--force").status, 0);
+  assert.equal(maw(repo, agent, "run", "--dry-run").status, 0);
 });
