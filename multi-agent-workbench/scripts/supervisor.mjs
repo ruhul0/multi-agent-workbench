@@ -16,11 +16,13 @@ export async function runWorkbench({
   dryRun = false,
   quiet = false,
 } = {}) {
-  root = resolve(root);
-  taskPath = resolve(root, taskPath || "tasks.json");
+  const cwd = resolve(root);
+  taskPath = resolve(cwd, taskPath || "tasks.json");
+  // Worktrees and .agent-workbench live relative to the repository root, even when
+  // maw is started from a subdirectory (otherwise worktrees would nest inside the repo).
+  root = findRepoRoot(cwd);
+  if (!root) throw new Error(`${cwd} is not inside a git repository. Run \`git init\` and make a first commit.`);
   const tasks = await loadTasks(taskPath, root);
-  const repoRoot = git(root, ["rev-parse", "--show-toplevel"]);
-  if (!repoRoot.ok) throw new Error(`${root} is not inside a git repository. Run \`git init\` and make a first commit.`);
   if (!git(root, ["rev-parse", "--verify", "HEAD"]).ok) throw new Error("The repository has no commits yet. Make an initial commit so worktrees can be created.");
 
   if (dryRun) {
@@ -85,10 +87,17 @@ export async function runWorkbench({
   const children = new Set();
   let interrupted = false;
   const onSignal = (signal) => {
-    if (interrupted) return;
+    if (interrupted) {
+      // Second Ctrl+C: stop waiting for agents that ignore SIGTERM.
+      for (const c of children) killTree(c, "SIGKILL");
+      console.error("maw: forced exit");
+      process.exit(130);
+    }
     interrupted = true;
-    for (const c of children) c.kill("SIGTERM");
-    log(`received ${signal}; stopping agents`).finally(() => { process.exitCode = 130; });
+    for (const c of children) killTree(c, "SIGTERM");
+    // Escalate if an agent is still alive after a grace period.
+    setTimeout(() => { for (const c of children) killTree(c, "SIGKILL"); }, 10_000).unref();
+    log(`received ${signal}; stopping agents (press Ctrl+C again to force)`).finally(() => { process.exitCode = 130; });
   };
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
@@ -208,6 +217,22 @@ async function ensureWorktree(root, t) {
   return r.ok ? { ok: true, created: true } : { ok: false, error: r.err || `git worktree add failed for ${path}` };
 }
 
+/** Absolute path of the git repository containing `cwd`, or null. */
+export function findRepoRoot(cwd = process.cwd()) {
+  const r = git(cwd, ["rev-parse", "--show-toplevel"]);
+  return r.ok && r.out ? resolve(r.out) : null;
+}
+
+/** Signal a child and everything it started (its process group on POSIX). */
+function killTree(child, signal) {
+  try {
+    if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch {
+    try { child.kill(signal); } catch {}
+  }
+}
+
 function git(cwd, args) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   return { ok: !r.error && r.status === 0, out: (r.stdout || "").trim(), err: (r.stderr || r.error?.message || "").trim() };
@@ -223,7 +248,9 @@ function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, c
     const settle = (v) => { if (!settled) { settled = true; done(v); } };
     let child;
     try {
-      child = spawn(cmd, args, { cwd, shell, stdio: ["ignore", "pipe", "pipe"], env: process.env });
+      // detached on POSIX puts the child in its own process group, so timeouts and
+      // Ctrl+C can stop the whole tree (agent tools, test runners), not just the CLI.
+      child = spawn(cmd, args, { cwd, shell, stdio: ["ignore", "pipe", "pipe"], env: process.env, detached: process.platform !== "win32" });
     } catch (error) {
       return settle({ code: 127, error: `could not start ${cmd}: ${error.message}` });
     }
@@ -231,8 +258,8 @@ function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, c
     let timedOut = false;
     const timer = timeoutMs ? setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
-      setTimeout(() => child.kill("SIGKILL"), 10_000).unref();
+      killTree(child, "SIGTERM");
+      setTimeout(() => killTree(child, "SIGKILL"), 10_000).unref();
     }, timeoutMs) : null;
     const pending = { stdout: "", stderr: "" };
     const handle = (stream, chunk) => {
@@ -258,6 +285,11 @@ function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, c
       const msg = error.code === "ENOENT" ? `${cmd} is not installed or not on PATH` : error.message;
       emit(msg, "stderr");
       settle({ code: 127, error: msg });
+    });
+    // A background process that inherited stdout can keep the pipes open long after
+    // the agent exits; stop waiting for them shortly after the agent itself is gone.
+    child.on("exit", () => {
+      setTimeout(() => { child.stdout.destroy(); child.stderr.destroy(); }, 2000).unref();
     });
     child.on("close", (code, signal) => {
       clearTimeout(timer);

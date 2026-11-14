@@ -9,7 +9,7 @@
 | `owner` | yes* | agent name | Queue name. Tasks with the same owner run one after another. |
 | `command` | no | `owner` | Agent CLI: `claude`, `codex` (aliases `chatgpt`, `openai`) or `agy` (alias `antigravity`). *Either `owner` or `command` must name a known agent. |
 | `task` | no | start of prompt | Short title shown in status and dashboard. |
-| `worktree` | no | `../<repo>-<owner>` | Worktree path, relative to the project root. Created with `git worktree add` if missing. |
+| `worktree` | no | `../<repo>-<owner>` | Worktree path, relative to the git repository root (also when `maw` runs from a subdirectory). Created with `git worktree add` if missing. |
 | `branch` | no | `maw/<owner>` | Branch checked out in the worktree. Created from `base` if missing. |
 | `base` | no | `HEAD` | Starting point for a new branch. |
 | `depends_on` | no | `[]` | Task ids that must be `done` first. If one fails, this task is `skipped`. |

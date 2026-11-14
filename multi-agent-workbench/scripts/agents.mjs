@@ -25,6 +25,7 @@ export const AGENTS = {
       "--dangerously-bypass-approvals-and-sandbox",
       ...opt("-m", task.model || process.env.CODEX_MODEL),
       ...(task.effort || process.env.CODEX_EFFORT ? ["-c", `model_reasoning_effort="${task.effort || process.env.CODEX_EFFORT}"`] : []),
+      "--", // so a prompt starting with "-" is not parsed as a flag
       task.prompt,
     ],
     auth: ["login", "status"],
