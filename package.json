@@ -1,0 +1,1 @@
+{"name":"multi-agent-workbench","version":"0.1.0","private":true,"type":"module","scripts":{"start":"node multi-agent-workbench/scripts/supervisor.mjs"}}
