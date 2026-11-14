@@ -1,8 +1,8 @@
 name: Publish
 # Publishes to npm when a version tag (v1.2.3) is pushed, or when started by hand
-# (Actions → Publish → Run workflow), using npm trusted publishing (OIDC): no token
-# secret is needed. Configure the package on npmjs.com under Settings → Trusted
-# Publisher → GitHub Actions with workflow filename "publish.yml".
+# (Actions → Publish → Run workflow). npm tries trusted publishing (OIDC) first
+# (npmjs.com → package Settings → Trusted Publisher → GitHub Actions, workflow
+# "publish.yml") and falls back to the NPM_TOKEN repository secret if that fails.
 on:
   push:
     tags: ["v*"]
@@ -15,11 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # No registry-url here: it makes setup-node set a placeholder NODE_AUTH_TOKEN,
-      # which npm then sends instead of using trusted publishing (fails with E404).
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
       # Trusted publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@latest
       - name: Tag matches package.json version
@@ -31,4 +30,7 @@ jobs:
           if npm view "multi-agent-workbench@$v" version >/dev/null 2>&1; then echo "$v is already on npm"; exit 1; fi
       - run: npm run check
       - run: npm test
-      - run: npm publish --access public
+      - run: npm publish --provenance --access public
+        env:
+          # Without this, setup-node leaves a placeholder token that breaks the publish.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
