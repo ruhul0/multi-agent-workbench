@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Run Claude Code, Codex and Antigravity CLIs in parallel git worktrees with task queues, dependencies, acceptance checks and a live status dashboard.",
   "type": "module",
   "bin": {

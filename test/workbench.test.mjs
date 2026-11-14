@@ -48,7 +48,7 @@ async function setup(tasks) {
 function maw(cwd, agent, ...args) {
   return spawnSync(process.execPath, [MAW, ...args], {
     cwd, encoding: "utf8",
-    env: { ...process.env, MAW_BIN_CLAUDE: agent, MAW_BIN_CODEX: agent, MAW_BIN_AGY: agent, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" },
+    env: { ...process.env, MAW_NO_DASHBOARD: "1", MAW_BIN_CLAUDE: agent, MAW_BIN_CODEX: agent, MAW_BIN_AGY: agent, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" },
   });
 }
 
@@ -126,4 +126,15 @@ test("validation catches bad tasks", () => {
   const [t] = normalizeTasks([{ id: "a", owner: "chatgpt", prompt: "x" }], "/r/app");
   assert.equal(t.agent, "codex");
   assert.equal(t.worktree, "/r/app-chatgpt");
+});
+
+test("run serves the dashboard and exits when not attached to a terminal", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "dash check" }]);
+  const port = String(40000 + Math.floor(Math.random() * 20000));
+  const r = spawnSync(process.execPath, [MAW, "--port", port], {
+    cwd: repo, encoding: "utf8", timeout: 30000,
+    env: { ...process.env, CI: "1", MAW_BIN_CLAUDE: agent, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" },
+  });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /live dashboard at http:\/\/127\.0\.0\.1:\d+/);
 });

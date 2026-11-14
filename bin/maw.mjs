@@ -7,14 +7,17 @@ import { resolve } from "node:path";
 import process from "node:process";
 import { runWorkbench } from "../multi-agent-workbench/scripts/supervisor.mjs";
 import { doctor } from "../multi-agent-workbench/scripts/doctor.mjs";
-import { dashboard } from "../multi-agent-workbench/scripts/dashboard.mjs";
+import { dashboard, openBrowser } from "../multi-agent-workbench/scripts/dashboard.mjs";
 
 const HELP = `multi-agent-workbench (maw) — run Claude Code, Codex and Antigravity tasks in parallel git worktrees
 
 Usage:
   maw init [--force]       Create a starter tasks.json in the current project
   maw doctor               Check that the agents used in tasks.json are installed and logged in
-  maw run [--dry-run]      Run the task queue (default command). --dry-run validates and prints the plan
+  maw run [--dry-run]      Run the task queue (default command) and open the live dashboard.
+                           --dry-run validates and prints the plan
+                           --no-open serves the dashboard without opening a browser
+                           --no-dashboard skips the dashboard entirely
   maw status               Print the latest .agent-workbench/status.json as a summary
   maw dashboard [--port N] Serve a live status page on http://127.0.0.1:4317
   maw install-skill        Install the planning skill for Codex and Claude Code
@@ -22,6 +25,7 @@ Usage:
 
 Options:
   --tasks <file>           Use a different task file (default: tasks.json)
+  --port <n>               Dashboard port (default 4317; the next free port is used if taken)
   -h, --help               Show this help
   -v, --version            Show the version
 
@@ -43,22 +47,55 @@ async function main() {
   switch (command) {
     case "init": return init();
     case "doctor": return (await doctor({ taskPath })) ? 0 : 1;
-    case "run": {
-      const { ok } = await runWorkbench({ taskPath, dryRun: flag("--dry-run") });
-      return process.exitCode === 130 ? 130 : ok ? 0 : 1;
-    }
+    case "run": return run();
     case "status": return status();
     case "install-skill": return installSkill();
     case "dashboard": {
-      const port = Number(value("--port") || 4317);
-      if (!Number.isInteger(port) || port <= 0) throw new Error("--port must be a positive integer");
-      dashboard({ port });
+      const { url } = await dashboard({ port: dashboardPort() });
+      console.log(`maw dashboard: ${url}  (Ctrl+C to stop)`);
+      if (!flag("--no-open")) openBrowser(url);
       return null; // keep the server running
     }
     default:
       console.error(`Unknown command "${command}".\n\n${HELP}`);
       return 2;
   }
+}
+
+function dashboardPort() {
+  const port = Number(value("--port") || 4317);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error("--port must be a valid port number");
+  return port;
+}
+
+async function run() {
+  const dryRun = flag("--dry-run");
+  const wantDashboard = !dryRun && !flag("--no-dashboard") && !process.env.MAW_NO_DASHBOARD;
+  let server = null;
+  if (wantDashboard) {
+    try {
+      const d = await dashboard({ port: dashboardPort() });
+      server = d.server;
+      console.log(`maw: live dashboard at ${d.url}`);
+      if (!flag("--no-open") && !process.env.CI) openBrowser(d.url);
+    } catch (error) {
+      console.error(`maw: dashboard unavailable (${error.message}); continuing without it`);
+    }
+  }
+  let code;
+  try {
+    const { ok } = await runWorkbench({ taskPath, dryRun });
+    code = process.exitCode === 130 ? 130 : ok ? 0 : 1;
+  } catch (error) {
+    server?.close();
+    throw error;
+  }
+  if (!server) return code;
+  // Keep the dashboard up for review when a person is watching; exit right away in scripts.
+  if (!process.stdin.isTTY || code === 130) { server.close(); return code; }
+  console.log("maw: run finished. Dashboard stays open for review; press Ctrl+C to exit.");
+  process.once("SIGINT", () => { server.close(); process.exit(code); });
+  return null;
 }
 
 async function init() {

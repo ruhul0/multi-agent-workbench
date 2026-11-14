@@ -28,8 +28,7 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--li
 cd your-project
 maw init          # starter tasks.json
 maw doctor        # agents installed and logged in?
-maw               # run the queues
-maw dashboard     # http://127.0.0.1:4317</pre>
+maw               # run; live dashboard opens in your browser</pre>
 <p class="warn"><strong>Warning:</strong> agents run with permission prompts disabled inside their worktrees. Use it only where that is acceptable, and review every commit before merging.</p>
 
 <h2>What it does</h2>
@@ -39,7 +38,8 @@ maw dashboard     # http://127.0.0.1:4317</pre>
 <li><code>depends_on</code> between tasks across agents</li>
 <li><code>check</code> commands that must pass for a task to count as done</li>
 <li>Commits read from git, plus uncommitted-change detection</li>
-<li>Status file, per-task logs and a live local dashboard</li>
+<li>Live dashboard opens automatically: agents, tasks, commits and output</li>
+<li>Status file and per-task logs</li>
 </ul>
 
 <h2>tasks.json</h2>
@@ -56,9 +56,9 @@ maw dashboard     # http://127.0.0.1:4317</pre>
 <div class="wrap"><table>
 <tr><td><code>maw init</code></td><td>Create a starter <code>tasks.json</code></td></tr>
 <tr><td><code>maw doctor</code></td><td>Check agents are installed and logged in (exit 1 if not)</td></tr>
-<tr><td><code>maw run [--dry-run]</code></td><td>Run, or validate and print the plan</td></tr>
+<tr><td><code>maw run [--dry-run]</code></td><td>Run and open the dashboard, or validate and print the plan</td></tr>
 <tr><td><code>maw status</code></td><td>Summarize the last run</td></tr>
-<tr><td><code>maw dashboard</code></td><td>Live status page on localhost</td></tr>
+<tr><td><code>maw dashboard</code></td><td>Reopen the status page for a finished run</td></tr>
 <tr><td><code>maw install-skill</code></td><td>Install the planning skill for Codex and Claude Code</td></tr>
 </table></div>
 

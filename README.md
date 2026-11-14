@@ -19,8 +19,7 @@ maw init            # writes a starter tasks.json
 # edit tasks.json
 maw doctor          # are the agents installed and logged in?
 maw run --dry-run   # validate the plan
-maw                 # run it
-maw dashboard       # in another terminal: http://127.0.0.1:4317
+maw                 # run it; the live dashboard opens in your browser
 ```
 
 Without installing: `npx multi-agent-workbench <command>`.
@@ -50,12 +49,22 @@ Full field reference: [`multi-agent-workbench/references/task-schema.md`](multi-
 |---|---|
 | `maw init [--force]` | Create a starter `tasks.json`. Won't overwrite without `--force`. |
 | `maw doctor` | Check the agents used in `tasks.json` (or all agents) are installed and logged in. Exits 1 if any are not. Never prints account details. |
-| `maw` / `maw run` | Run the queues. Exits 0 only if every task is done. `--dry-run` validates and prints the plan. |
+| `maw` / `maw run` | Run the queues and open the live dashboard. Exits 0 only if every task is done. `--dry-run` validates and prints the plan; `--no-open` serves the dashboard without opening a browser; `--no-dashboard` skips it. |
 | `maw status` | Summarize the last run. |
-| `maw dashboard [--port N]` | Live status page on localhost (agents, tasks, commits, recent output). |
+| `maw dashboard [--port N]` | Open the status page on its own, e.g. to review a finished run. |
 | `maw install-skill` | Install the planning skill for Codex and Claude Code (`--codex` / `--claude` for one). |
 
 All commands accept `--tasks <file>` to use a different task file.
+
+## Live dashboard
+
+`maw` starts a status page at http://127.0.0.1:4317 (or the next free port) and opens it in your browser. It refreshes every 2 seconds and shows:
+
+- each agent's current task, state, latest commit and last 30 lines of output
+- every task's state, owner, commit, check result and why it was skipped or blocked
+- recent supervisor events
+
+When the run finishes, the page stays up for review until you press Ctrl+C. In scripts and CI (no terminal attached) `maw` exits as soon as the run ends, and the browser is not opened when `CI` is set.
 
 ## Output
 

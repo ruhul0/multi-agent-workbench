@@ -26,8 +26,8 @@ The full field list is in `references/task-schema.md`. Validate the plan with `m
 
 ## 3. Run and monitor
 
-- Start `maw` (it blocks until all queues finish; run it in the background if your environment allows).
-- Offer `maw dashboard` for a live page at http://127.0.0.1:4317, or read `.agent-workbench/status.json` / `maw status`.
+- Start `maw` (it blocks until all queues finish; run it in the background if your environment allows). It opens a live dashboard in the user's browser at http://127.0.0.1:4317; tell them the URL. Use `--no-open` if they don't want a browser window.
+- Read progress from `.agent-workbench/status.json` or `maw status`.
 - Report to the user whenever a task finishes, fails, or is skipped. Per-task logs are in `.agent-workbench/logs/<id>.log`.
 - If a task is `blocked`, read its log, fix the prompt or split it, and re-run with a new `tasks.json` containing only the remaining work.
 
