@@ -13,10 +13,13 @@ Create `tasks.json` in your project:
 ]
 ```
 
-Run:
+Install and run:
 
 ```bash
-node /path/to/multi-agent-workbench/multi-agent-workbench/scripts/supervisor.mjs
+npm install -g multi-agent-workbench
+multi-agent-workbench
+# or without installing
+npx multi-agent-workbench
 ```
 
-The supervisor writes `.agent-workbench/status.json` and `.agent-workbench/supervisor.log`. Review each commit before merging or deploying.
+The supervisor reads `tasks.json` from the current project and writes `.agent-workbench/status.json` and `.agent-workbench/supervisor.log`. Review each commit before merging or deploying.
