@@ -1,6 +1,13 @@
 # Multi-Agent Workbench
 
+[![npm](https://img.shields.io/npm/v/multi-agent-workbench)](https://www.npmjs.com/package/multi-agent-workbench) [![CI](https://github.com/ruhul0/multi-agent-workbench/actions/workflows/ci.yml/badge.svg)](https://github.com/ruhul0/multi-agent-workbench/actions/workflows/ci.yml) [![license](https://img.shields.io/npm/l/multi-agent-workbench)](LICENSE)
+
 Run Claude Code, Codex and Antigravity CLIs in parallel. Each agent works in its own git worktree, takes small tasks from its own queue, and reports commits, check results and output to a live status file and dashboard.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/ruhul0/multi-agent-workbench/main/docs/dashboard-dark.png">
+  <img alt="maw live dashboard: agent cards with live output, task board by state, and activity timeline" src="https://raw.githubusercontent.com/ruhul0/multi-agent-workbench/main/docs/dashboard-light.png">
+</picture>
 
 > **Warning:** `maw` starts agents with their permission prompts disabled (`--dangerously-skip-permissions`, `--dangerously-bypass-approvals-and-sandbox`). They can run any command as your user. Only use it on repositories and machines where that is acceptable, and review every commit before merging.
 
