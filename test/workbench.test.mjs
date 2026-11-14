@@ -404,3 +404,17 @@ test("bundled examples and the starter file are valid", async () => {
   assert.equal(maw(repo, agent, "init", "--force").status, 0);
   assert.equal(maw(repo, agent, "run", "--dry-run").status, 0);
 });
+
+test("doctor --deep sends a test request and reports agents that cannot answer", async () => {
+  const { repo, base } = await setup([{ id: "L1", owner: "claude", prompt: "x" }, { id: "C1", owner: "codex", prompt: "y" }]);
+  const good = await script(base, "good.sh", 'case "$1" in auth|login) exit 0;; esac\necho ok');
+  const bad = await script(base, "bad.sh", "case \"$1\" in --version|login) exit 0;; esac\necho \"error: model not supported for someone@example.com\" >&2; exit 1");
+  const r = spawnSync(process.execPath, [MAW, "doctor", "--deep", "--json"], { cwd: repo, encoding: "utf8", env: { ...process.env, MAW_BIN_CLAUDE: good, MAW_BIN_CODEX: bad } });
+  assert.equal(r.status, 1, r.stderr);
+  const report = JSON.parse(r.stdout);
+  assert.equal(report.agents.find(a => a.agent === "claude").responds, true);
+  const codex = report.agents.find(a => a.agent === "codex");
+  assert.equal(codex.status, "not_responding");
+  assert.match(codex.reason, /model not supported/);
+  assert.doesNotMatch(codex.reason, /example\.com/);
+});

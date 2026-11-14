@@ -14,6 +14,7 @@
 - **Safety options:** `env.allow` / `env.set`, a `sandbox` command prefix.
 - **Notifications:** `--notify` / `notify.desktop` and `notify.webhook`.
 - `maw run --resume` keeps tasks finished in the previous run.
+- `maw doctor --deep` sends each agent a tiny read-only request, catching problems a login check cannot (for example a default model the account may not use).
 - Codex runs with `--json`, so its output is readable and its usage is tracked.
 - `tasks.schema.json` for editor autocomplete, `examples/`, and a Claude Code plugin manifest.
 

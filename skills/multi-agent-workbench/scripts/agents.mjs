@@ -51,7 +51,7 @@ export const AGENTS = {
       prompt,
     ],
     resume: true,
-    planArgs: (prompt) => ["exec", "--sandbox", "read-only", "--", prompt],
+    planArgs: (prompt) => ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "--", prompt],
     auth: ["login", "status"],
     login: "codex login",
     format: formatCodexEvent,
