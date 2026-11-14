@@ -19,7 +19,8 @@ Usage:
   maw plan [PLAN.md | "goal"]  Split a plan into micro-tasks assigned to agents (writes tasks.json)
                                --agents claude,codex  limit who gets work   --planner <agent>
   maw init [--force]           Create a starter tasks.json by hand instead
-  maw doctor [--json]          Check that the agents used in tasks.json are installed and logged in
+  maw doctor [--json] [--deep] Check that the agents used in tasks.json are installed and logged in
+                               (--deep also sends each one a tiny test request)
   maw run                      Run the task queue (default command) and open the live dashboard
                                --dry-run       validate and print the plan
                                --resume        keep tasks already done in the previous run
@@ -55,6 +56,7 @@ try {
       version: { type: "boolean", short: "v" },
       force: { type: "boolean" },
       json: { type: "boolean" },
+      deep: { type: "boolean" },
       "dry-run": { type: "boolean" },
       resume: { type: "boolean" },
       notify: { type: "boolean" },
@@ -95,7 +97,7 @@ async function main() {
   switch (command) {
     case "init": return init();
     case "plan": return plan();
-    case "doctor": return (await doctor({ taskPath, json: flag("json") })) ? 0 : 1;
+    case "doctor": return (await doctor({ taskPath, json: flag("json"), deep: flag("deep") })) ? 0 : 1;
     case "run": return run();
     case "status": return status();
     case "review": return (await review({ json: flag("json") })) ? 0 : 1;

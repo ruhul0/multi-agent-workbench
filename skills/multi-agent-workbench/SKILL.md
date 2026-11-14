@@ -13,7 +13,7 @@ The flow is: **plan → micro-tasks → assign → run (dashboard) → review �
 
 1. The project must be a git repository with at least one commit. Check `git status`; uncommitted work in the main checkout is not seen by agents.
 2. Check `maw` is available: `maw --version`, otherwise use `npx multi-agent-workbench` in place of `maw`.
-3. Run `maw doctor`. Stop and tell the user about any agent marked ✗ (missing or not logged in). Agents marked `!` are installed but their login cannot be checked; mention it.
+3. Run `maw doctor --deep` (sends each agent a tiny test request). Stop and tell the user about any agent marked ✗ (missing or not logged in). Agents marked `!` are installed but their login cannot be checked; mention it.
 4. Tell the user before the first run that agents run with permission prompts disabled inside their worktrees.
 
 ## 2. The plan (the user's)

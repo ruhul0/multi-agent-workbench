@@ -24,7 +24,7 @@ npm install -g multi-agent-workbench
 cd your-project
 $EDITOR PLAN.md          # 1. write the plan: goal, parts, constraints, how to verify
 maw plan PLAN.md         # 2. split it into micro-tasks and assign agents (writes tasks.json)
-maw doctor               #    are those agents installed and logged in?
+maw doctor --deep        #    are those agents installed, logged in and answering?
 maw run --dry-run        #    check the task list
 maw                      # 3. run it; the live dashboard opens in your browser
 maw review               # 4. commits, changes and check results per task
@@ -74,7 +74,7 @@ The `$schema` line gives editors autocomplete and validation. Full field referen
 |---|---|
 | `maw plan [PLAN.md \| "goal"]` | Split a plan into micro-tasks and write `tasks.json`. `--agents claude,codex` limits who gets work, `--planner <agent>` picks the planner, `--force` replaces an existing file. |
 | `maw init [--force]` | Create a starter `tasks.json` by hand. |
-| `maw doctor [--json]` | Check the agents used in `tasks.json` are installed and logged in. Exits 1 if any are not. Never prints account details. |
+| `maw doctor [--json] [--deep]` | Check the agents used in `tasks.json` are installed and logged in. `--deep` also sends each one a tiny read-only request, which catches problems such as a default model your account cannot use. Exits 1 if any agent is not ready. Never prints account details. |
 | `maw` / `maw run` | Run the queues and open the live dashboard. Exits 0 only if every task is done. `--dry-run` validates and prints the plan; `--resume` keeps tasks already done in the last run; `--max-parallel N`; `--notify` for a desktop notification; `--no-open`; `--no-dashboard`. |
 | `maw status` | Summarize the last run. |
 | `maw review [--json]` | Each task's commits, line counts, check result and leftover changes. |
