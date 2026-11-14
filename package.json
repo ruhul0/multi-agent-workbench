@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ruhul0/multi-agent-workbench.git"
+    "url": "git+https://github.com/ruhul0/multi-agent-workbench.git"
   },
   "bugs": {
     "url": "https://github.com/ruhul0/multi-agent-workbench/issues"
