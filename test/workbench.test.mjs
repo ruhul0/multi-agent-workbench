@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeTasks } from "../multi-agent-workbench/scripts/tasks.mjs";
-import { formatClaudeEvent } from "../multi-agent-workbench/scripts/agents.mjs";
+import { formatClaudeEvent, AGENTS } from "../multi-agent-workbench/scripts/agents.mjs";
 import { spawn } from "node:child_process";
 
 const MAW = fileURLToPath(new URL("../bin/maw.mjs", import.meta.url));
@@ -165,4 +165,45 @@ test("claude stream-json events become readable lines", () => {
   assert.deepEqual(ev({ type: "user", message: { content: [{ type: "tool_result", is_error: true, content: "boom\nmore" }] } }), ["  ✕ boom"]);
   assert.deepEqual(ev({ type: "result", subtype: "success", num_turns: 4 }), ["✓ finished in 4 turns"]);
   assert.deepEqual(formatClaudeEvent("plain text"), ["plain text"]);
+});
+
+test("timeout stops the agent's whole process tree promptly", async () => {
+  const { repo, base } = await setup([{ id: "L1", owner: "claude", prompt: "x", timeout_minutes: 0.03 }]);
+  // The agent leaves a background child holding stdout, like a tool call or test runner would.
+  const agent = join(base, "hang.sh");
+  await writeFile(agent, "#!/bin/sh\nsleep 30 &\nsleep 30\n");
+  await chmod(agent, 0o755);
+  const started = Date.now();
+  const r = maw(repo, agent);
+  const elapsed = Date.now() - started;
+  assert.equal(r.status, 1, r.stderr + r.stdout);
+  assert.ok(elapsed < 15000, `run took ${elapsed}ms after a ~2s timeout`);
+  const s = await statusOf(repo);
+  assert.match(s.tasks[0].reason, /timed out/);
+});
+
+test("running from a subdirectory keeps worktrees and state outside the repo", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "sub run" }]);
+  const sub = join(repo, "packages", "app");
+  await mkdir(sub, { recursive: true });
+  await writeFile(join(sub, "tasks.json"), JSON.stringify([{ id: "L1", owner: "claude", prompt: "sub run" }]));
+  const r = maw(sub, agent);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const s = await statusOf(repo);
+  const top = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: repo, encoding: "utf8" }).trim();
+  assert.ok(!s.tasks[0].worktree.startsWith(top + "/"), `worktree ${s.tasks[0].worktree} is inside the repo`);
+  assert.equal(maw(sub, agent, "status").status, 0);
+});
+
+test("unknown flags are rejected instead of starting a run", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "x" }]);
+  const r = maw(repo, agent, "--dryrun");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Unknown option '--dryrun'/);
+  await assert.rejects(statusOf(repo));
+});
+
+test("codex prompts starting with a dash are passed after --", () => {
+  const args = AGENTS.codex.args({ prompt: "-fix the build" });
+  assert.deepEqual(args.slice(-2), ["--", "-fix the build"]);
 });

@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
-import { runWorkbench } from "../multi-agent-workbench/scripts/supervisor.mjs";
+import { parseArgs } from "node:util";
+import { runWorkbench, findRepoRoot } from "../multi-agent-workbench/scripts/supervisor.mjs";
 import { doctor } from "../multi-agent-workbench/scripts/doctor.mjs";
 import { dashboard, openBrowser } from "../multi-agent-workbench/scripts/dashboard.mjs";
 
@@ -31,15 +32,39 @@ Options:
 
 Agents run with permission prompts disabled inside their worktrees. Review every commit before merging.`;
 
-const argv = process.argv.slice(2);
-const flag = (name) => argv.includes(name);
-const value = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
-const command = argv.find((a, i) => !a.startsWith("-") && !["--tasks", "--port"].includes(argv[i - 1])) || "run";
+// Strict parsing: a mistyped flag (e.g. --dryrun) must fail instead of starting a real run.
+let args;
+try {
+  args = parseArgs({
+    allowPositionals: true,
+    options: {
+      help: { type: "boolean", short: "h" },
+      version: { type: "boolean", short: "v" },
+      force: { type: "boolean" },
+      json: { type: "boolean" },
+      "dry-run": { type: "boolean" },
+      "no-open": { type: "boolean" },
+      "no-dashboard": { type: "boolean" },
+      codex: { type: "boolean" },
+      claude: { type: "boolean" },
+      tasks: { type: "string" },
+      port: { type: "string" },
+    },
+  });
+} catch (error) {
+  console.error(`maw: ${error.message.split(". To specify")[0]}\nRun \`maw --help\` for usage.`);
+  process.exit(2);
+}
+const flag = (name) => args.values[name.replace(/^-+/, "")] === true;
+const value = (name) => args.values[name.replace(/^-+/, "")];
+const command = args.positionals[0] || "run";
 const taskPath = value("--tasks");
+// State lives at the repository root so `maw status` and the dashboard work from any subdirectory.
+const stateRoot = () => findRepoRoot(process.cwd()) || process.cwd();
 
 async function main() {
-  if (flag("-h") || flag("--help") || command === "help") { console.log(HELP); return 0; }
-  if (flag("-v") || flag("--version")) {
+  if (flag("--help") || command === "help") { console.log(HELP); return 0; }
+  if (flag("--version")) {
     const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
     console.log(pkg.version);
     return 0;
@@ -51,7 +76,7 @@ async function main() {
     case "status": return status();
     case "install-skill": return installSkill();
     case "dashboard": {
-      const { url } = await dashboard({ port: dashboardPort() });
+      const { url } = await dashboard({ root: stateRoot(), port: dashboardPort() });
       console.log(`maw dashboard: ${url}  (Ctrl+C to stop)`);
       if (!flag("--no-open")) openBrowser(url);
       return null; // keep the server running
@@ -74,7 +99,7 @@ async function run() {
   let server = null;
   if (wantDashboard) {
     try {
-      const d = await dashboard({ port: dashboardPort() });
+      const d = await dashboard({ root: stateRoot(), port: dashboardPort() });
       server = d.server;
       console.log(`maw: live dashboard at ${d.url}`);
       if (!flag("--no-open") && !process.env.CI) openBrowser(d.url);
@@ -129,7 +154,7 @@ async function installSkill() {
 }
 
 async function status() {
-  const path = resolve(process.cwd(), ".agent-workbench/status.json");
+  const path = resolve(stateRoot(), ".agent-workbench/status.json");
   let s;
   try { s = JSON.parse(await readFile(path, "utf8")); } catch {
     console.error("No status yet. Run `maw` in this project first.");
