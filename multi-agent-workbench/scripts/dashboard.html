@@ -123,6 +123,44 @@ h2 .count{background:var(--panel2);border:1px solid var(--line);color:var(--fg2)
 @media (max-width:1100px){.board{grid-template-columns:repeat(3,minmax(0,1fr))}.summary{grid-template-columns:1fr}}
 @media (max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat .v{font-size:24px}.wrap,.bar{padding-left:16px;padding-right:16px}.board{grid-template-columns:1fr}.agents{grid-template-columns:1fr}.meta{width:100%}.ev{grid-template-columns:70px 14px 1fr;padding:6px 12px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* plan, next-up, commits, diff viewer */
+.plan{margin:22px 0 0;padding:16px 18px}
+.plan .k{color:var(--muted);font-size:12px;font-weight:550;text-transform:uppercase;letter-spacing:.06em}
+.plan .t{font-weight:650;font-size:16px;margin-top:2px}
+.plan .d{color:var(--fg2);margin-top:4px;white-space:pre-wrap}
+.sect{padding:10px 16px;border-top:1px solid var(--line)}
+.sect .k{color:var(--muted);font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.next{list-style:none;margin:0;padding:0;font-size:12.5px;color:var(--fg2)}
+.next li{display:flex;gap:8px;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next li code{color:var(--muted)}
+.clist{list-style:none;margin:0;padding:0}
+.clist li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline;padding:3px 0;font-size:12.5px;cursor:pointer}
+.clist li:hover .subj{text-decoration:underline}
+.clist .sha{font-family:var(--mono);font-size:11.5px;color:var(--accent,var(--run))}
+.clist .subj{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg2)}
+.delta{font-family:var(--mono);font-size:11px;white-space:nowrap}.delta .a{color:var(--done)}.delta .r{color:var(--bad)}
+.btn{font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line2);background:var(--panel2);color:var(--fg2);border-radius:8px;padding:3px 10px;cursor:pointer}
+.btn:hover{border-color:var(--muted);color:var(--fg)}
+.btn.danger{color:var(--bad)}
+.files{list-style:none;margin:8px 0 0;padding:0;font-family:var(--mono);font-size:11.5px;max-height:160px;overflow:auto}
+.files li{display:flex;gap:8px;color:var(--fg2)}.files b{width:12px;font-weight:700}
+.files .A,.files .\?{color:var(--done)}.files .D{color:var(--bad)}.files .M{color:var(--run)}.files .R{color:var(--skip)}
+.history{padding:4px 0}
+.hrow{display:grid;grid-template-columns:86px minmax(0,140px) 130px 1fr auto;gap:10px;padding:7px 16px;align-items:center;font-size:13px;cursor:pointer}
+.hrow:hover{background:var(--panel2)}
+.hrow time{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.hrow .who{display:flex;align-items:center;gap:6px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .who i{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none}
+.hrow .tid{white-space:nowrap;color:var(--muted)}
+.hrow .subj{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+dialog{width:min(1100px,calc(100vw - 32px));max-height:calc(100vh - 64px);padding:0;border:1px solid var(--line2);border-radius:14px;background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dhead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+.dhead b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diff{margin:0;padding:12px 16px;font-family:var(--mono);font-size:12px;line-height:1.5;white-space:pre;overflow:auto;max-height:calc(100vh - 140px);background:var(--term);color:var(--termfg)}
+.diff .add{color:#56d38f}.diff .del{color:#ff7b7b}.diff .hunk{color:#7cb7ff}.diff .meta{color:#c9a227;font-weight:600}
+@media (max-width:700px){.hrow{grid-template-columns:60px 1fr auto;padding:7px 12px}.hrow .tid,.hrow .who{display:none}}
 </style>
 </head>
 <body>
@@ -133,12 +171,15 @@ h2 .count{background:var(--panel2);border:1px solid var(--line);color:var(--fg2)
   <div class="pill" id="runpill"><span class="dot"></span><span>Connecting…</span></div>
 </div></header>
 
+<dialog id="diffbox"><div class="dhead"><b id="difftitle">Changes</b><button class="btn" id="diffclose" type="button">Close</button></div><pre class="diff" id="diffbody"></pre></dialog>
+
 <div class="wrap" id="app"><div class="banner card"><b>Waiting for the supervisor…</b>Status appears here as soon as <code>maw</code> starts.</div></div>
 
 <script>
+/*MAW_CONFIG*/
+const CFG=window.MAW||{token:"",actions:false};
 const PALETTE={claude:"#e8875f",codex:"#22b38a",chatgpt:"#22b38a",openai:"#22b38a",agy:"#748ffc",antigravity:"#748ffc"};
 const EXTRA=["#e5a50a","#c061cb","#26a7c9","#f05d8c","#8bb33a"];
-const KIND={claude:"Claude Code",codex:"Codex CLI",agy:"Antigravity CLI"};
 const COLS=[["pending","Queued"],["running","Running"],["done","Done"],["blocked","Blocked"],["skipped","Skipped"]];
 const COLOR={done:"var(--done)",running:"var(--run)",blocked:"var(--bad)",skipped:"var(--skip)",pending:"var(--line2)"};
 const open=new Set();let last=null,offline=false;
@@ -146,11 +187,16 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const accent=(owner,agent,i)=>PALETTE[String(owner).toLowerCase()]||PALETTE[agent]||EXTRA[i%EXTRA.length];
 function dur(a,b){if(!a)return"";const s=Math.max(0,Math.round(((b?new Date(b):new Date())-new Date(a))/1000));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}h ${m}m`:m?`${m}m ${String(x).padStart(2,"0")}s`:`${x}s`}
 function ago(t){const s=Math.round((Date.now()-new Date(t))/1000);return s<5?"just now":s<60?`${s}s ago`:s<3600?`${Math.floor(s/60)}m ago`:`${Math.floor(s/3600)}h ago`}
+const clock=t=>t?new Date(t).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"";
+const money=n=>n?`$${n.toFixed(n<1?3:2)}`:"";
 const chip=st=>`<span class="chip s-${esc(st)}"><span class="dot"></span>${esc(st==="working"?"running":st)}</span>`;
+const delta=c=>`<span class="delta">${c.insertions?`<span class="a">+${c.insertions}</span> `:""}${c.deletions?`<span class="r">−${c.deletions}</span>`:""}</span>`;
+// status.json from older versions stored commits as "sha subject" strings
+const commitsOf=t=>(t.commits||[]).map(c=>typeof c==="string"?{short:c.split(" ")[0],sha:c.split(" ")[0],subject:c.slice(c.indexOf(" ")+1)}:c);
 
 function render(s){
   const tasks=s.tasks||[],owners=[...new Set(tasks.map(t=>t.owner))];
-  const ownerInfo=Object.fromEntries(owners.map((o,i)=>{const t=tasks.find(x=>x.owner===o);return[o,{accent:accent(o,t.agent,i),agent:t.agent}]}));
+  const ownerInfo=Object.fromEntries(owners.map((o,i)=>{const t=tasks.find(x=>x.owner===o);return[o,{accent:accent(o,t.agent,i),agent:t.agent,label:t.agent_label||t.agent}]}));
   const c={pending:0,running:0,done:0,blocked:0,skipped:0};tasks.forEach(t=>c[t.state]=(c[t.state]||0)+1);
   const failed=c.blocked+c.skipped>0;
   document.getElementById("project").textContent="· "+String(s.root||"").split("/").filter(Boolean).pop();
@@ -158,67 +204,110 @@ function render(s){
   const pstate=offline?["Disconnected","var(--muted)",false]:!s.finished?["Running","var(--run)",true]:failed?["Finished with issues","var(--bad)",false]:["All tasks done","var(--done)",false];
   pill.className="pill"+(pstate[2]?" live":"");pill.style.color=pstate[1];pill.innerHTML=`<span class="dot"></span><span>${pstate[0]}</span>`;
   const endT=s.finished?s.updated_at:null;
-  document.getElementById("meta").innerHTML=`<span>Elapsed <b>${dur(s.started_at,endT)}</b></span><span>Updated <b>${ago(s.updated_at)}</b></span>`;
+  const stopAll=CFG.actions&&!s.finished&&!offline?`<button class="btn danger" data-stop-all>Stop all</button>`:"";
+  document.getElementById("meta").innerHTML=`<span>Elapsed <b>${dur(s.started_at,endT)}</b></span><span>Updated <b>${ago(s.updated_at)}</b></span>${stopAll}`;
 
   // remember scroll state of terminals
   const scroll={};document.querySelectorAll(".term[data-owner]").forEach(el=>{scroll[el.dataset.owner]={top:el.scrollTop,stick:el.scrollTop+el.clientHeight>=el.scrollHeight-8}});
+
+  const allCommits=tasks.flatMap(t=>commitsOf(t).map(cm=>({...cm,task:t}))).sort((a,b)=>new Date(b.time||0)-new Date(a.time||0));
+  const cost=s.usage?.cost_usd||tasks.reduce((n,t)=>n+(t.usage?.cost_usd||0),0);
+  const plan=s.plan&&(s.plan.title||s.plan.summary)?`<section class="card plan"><div class="k">Plan${s.plan.source?` · ${esc(s.plan.source)}`:""}</div><div class="t">${esc(s.plan.title)}</div>${s.plan.summary?`<div class="d">${esc(s.plan.summary)}</div>`:""}</section>`:"";
 
   const total=tasks.length||1;
   const summary=`<section class="summary">
     <div class="card stat"><div class="k">Progress</div><div class="v">${c.done}<small> / ${tasks.length} tasks done</small></div>
       <div class="progress">${["done","running","blocked","skipped","pending"].filter(k=>c[k]).map(k=>`<span style="flex-grow:${c[k]/total};background:${COLOR[k]}"></span>`).join("")}</div>
       <div class="legend">${["done","running","blocked","skipped","pending"].map(k=>`<span><i style="background:${COLOR[k]}"></i>${c[k]} ${k}</span>`).join("")}</div></div>
-    <div class="stats"><div class="card stat"><div class="k">Agents</div><div class="v">${owners.length}</div><div class="akind">${Object.values(s.agents||{}).filter(a=>a.state==="working").length} active now</div></div>
-    <div class="card stat"><div class="k">Running</div><div class="v" style="color:var(--run)">${c.running}</div></div>
-    <div class="card stat"><div class="k">Commits</div><div class="v">${tasks.reduce((n,t)=>n+(t.commits?.length||0),0)}</div></div>
-    <div class="card stat"><div class="k">Blocked</div><div class="v" style="color:${c.blocked?"var(--bad)":"inherit"}">${c.blocked}</div></div></div>
+    <div class="stats"><div class="card stat"><div class="k">Agents</div><div class="v">${owners.length}</div><div class="akind">${c.running} running now</div></div>
+    <div class="card stat"><div class="k">Commits</div><div class="v">${allCommits.length}</div><div class="akind">${tasks.reduce((n,t)=>n+(t.files?.length||0),0)} files touched</div></div>
+    <div class="card stat"><div class="k">Blocked</div><div class="v" style="color:${c.blocked?"var(--bad)":"inherit"}">${c.blocked}</div></div>
+    <div class="card stat"><div class="k">Cost</div><div class="v">${money(cost)||"—"}</div><div class="akind">${s.budget_usd?`budget $${esc(s.budget_usd)}`:"reported by agents"}</div></div></div>
   </section>`;
 
   const agents=owners.map(o=>{
-    const a=(s.agents||{})[o],info=ownerInfo[o],mine=tasks.filter(t=>t.owner===o);
-    const cur=a?tasks.find(t=>t.id===a.task_id):mine.find(t=>t.state==="pending");
-    const st=a?a.state:"idle";
-    const out=(a?.output||[]).join("\n");
-    const sub=cur?[`<code>${esc(cur.id)}</code>`,cur.branch&&`<span>⎇ ${esc(cur.branch)}</span>`,cur.started_at&&`<span>⏱ ${dur(cur.started_at,cur.finished_at)}</span>`,a?.commit&&`<code>${esc(a.commit)}</code>`].filter(Boolean).join(""):"";
+    const info=ownerInfo[o],mine=tasks.filter(t=>t.owner===o);
+    const runningNow=mine.filter(t=>t.state==="running");
+    const cur=runningNow[0]||[...mine].reverse().find(t=>t.started_at)||mine.find(t=>t.state==="pending");
+    const st=runningNow.length?"working":cur&&cur.state!=="pending"?cur.state:"idle";
+    const out=(cur?.output||[]).join("\n");
+    const sub=cur?[`<code>${esc(cur.id)}</code>`,cur.branch&&`<span>⎇ ${esc(cur.branch)}</span>`,cur.started_at&&`<span>⏱ ${dur(cur.started_at,cur.finished_at)}</span>`,cur.attempts>1&&cur.attempt>0&&`<span>attempt ${cur.attempt}/${cur.attempts}</span>`,cur.commit&&`<code>${esc(cur.commit.slice(0,7))}</code>`].filter(Boolean).join(""):"";
+    const stop=CFG.actions&&cur?.state==="running"?`<button class="btn danger" data-stop="${esc(cur.id)}">Stop</button>`:"";
+    const next=mine.filter(t=>t.state==="pending");
+    const commits=mine.flatMap(t=>commitsOf(t).map(cm=>({...cm,task:t}))).sort((a,b)=>new Date(b.time||0)-new Date(a.time||0));
+    const spent=mine.reduce((n,t)=>n+(t.usage?.cost_usd||0),0);
     return `<article class="card agent ${esc(st)}" style="--accent:${info.accent}">
       <div class="ahead"><div class="avatar">${esc(o[0]?.toUpperCase())}</div>
-        <div style="min-width:0"><div class="aname">${esc(o)}</div><div class="akind">${esc(KIND[info.agent]||info.agent)} · ${mine.filter(t=>t.state==="done").length}/${mine.length} done</div></div>
-        <div class="spacer"></div>${chip(st)}</div>
-      <div class="current"><div class="title">${cur?esc(cur.task||cur.id):"No tasks"}</div><div class="sub">${sub}</div></div>
+        <div style="min-width:0"><div class="aname">${esc(o)}</div><div class="akind">${esc(info.label)} · ${mine.filter(t=>t.state==="done").length}/${mine.length} done${spent?` · ${money(spent)}`:""}</div></div>
+        <div class="spacer"></div>${stop}${chip(st)}</div>
+      <div class="current"><div class="title">${runningNow.length?"Now: ":cur&&cur.state==="pending"?"Next: ":"Last: "}${cur?esc(cur.task||cur.id):"No tasks"}</div><div class="sub">${sub}</div></div>
       <div class="queue">${mine.map(t=>`<span class="${esc(t.state)}" title="${esc(t.id)} · ${esc(t.state)}"></span>`).join("")}</div>
       <div class="term" data-owner="${esc(o)}">${out?esc(out):`<span class="empty">${st==="idle"?"Waiting for its turn…":"No output yet…"}</span>`}</div>
+      <div class="sect"><div class="k">Up next${next.length?` · ${next.length}`:""}</div>${next.length?`<ol class="next">${next.slice(0,4).map(t=>`<li><code>${esc(t.id)}</code>${esc(t.task||t.id)}${t.depends_on?.length?` <span class="akind">after ${esc(t.depends_on.join(", "))}</span>`:""}</li>`).join("")}${next.length>4?`<li class="akind">+${next.length-4} more</li>`:""}</ol>`:`<div class="akind">Nothing queued</div>`}</div>
+      <div class="sect"><div class="k">Commits${commits.length?` · ${commits.length}`:""}</div>${commits.length?`<ul class="clist">${commits.slice(0,5).map(cm=>`<li data-diff-task="${esc(cm.task.id)}" data-diff-sha="${esc(cm.sha)}" title="${esc(cm.subject)}"><span class="sha">${esc(cm.short)}</span><span class="subj">${esc(cm.subject)}</span>${delta(cm)}</li>`).join("")}</ul>`:`<div class="akind">No commits yet</div>`}</div>
     </article>`}).join("");
 
   const board=COLS.map(([k,label])=>{const list=tasks.filter(t=>t.state===k);
     return `<div class="col"><div class="colhead"><span class="dot" style="color:${COLOR[k]}"></span>${label}<span class="n">${list.length}</span></div>
     ${list.map(t=>{const info=ownerInfo[t.owner];const chk=t.check&&t.check.passed!=null?`<span class="tag ${t.check.passed?"ok":"no"}">${t.check.passed?"✓":"✕"} check</span>`:t.check?`<span class="tag">check</span>`:"";
+      const cms=commitsOf(t);
       return `<div class="task ${esc(t.state)} ${open.has(t.id)?"open":""}" data-id="${esc(t.id)}" style="--accent:${info.accent}">
         <div class="top"><span class="id">${esc(t.id)}</span><span class="owner"><i></i>${esc(t.owner)}</span></div>
         <div class="name">${esc(t.task||t.id)}</div>
-        <div class="info">${t.commit?`<span class="tag mono">${esc(t.commit.slice(0,7))}</span>`:""}${chk}${t.started_at?`<span>⏱ ${dur(t.started_at,t.finished_at)}</span>`:""}${t.depends_on?.length?`<span>after ${esc(t.depends_on.join(", "))}</span>`:""}${t.dirty?`<span class="tag no">uncommitted</span>`:""}</div>
+        <div class="info">${t.commit?`<span class="tag mono">${esc(t.commit.slice(0,7))}</span>`:""}${chk}${t.started_at?`<span>⏱ ${dur(t.started_at,t.finished_at)}</span>`:""}${t.attempt>1?`<span>attempt ${t.attempt}</span>`:""}${t.usage?.cost_usd?`<span>${money(t.usage.cost_usd)}</span>`:""}${t.depends_on?.length?`<span>after ${esc(t.depends_on.join(", "))}</span>`:""}${t.dirty?`<span class="tag no">uncommitted</span>`:""}</div>
         ${t.reason?`<div class="reason">${esc(t.reason)}</div>`:""}
-        <div class="detail"><div class="kv"><span>Branch</span><code>${esc(t.branch)}</code><span>Worktree</span><code>${esc(t.worktree)}</code>${t.check?`<span>Check</span><code>${esc(t.check.command)}</code>`:""}${t.exit_code!=null?`<span>Exit</span><code>${esc(t.exit_code)}</code>`:""}</div>
-          ${t.commits?.length?`<pre>${esc(t.commits.join("\n"))}</pre>`:""}${t.output?.length?`<pre>${esc(t.output.join("\n"))}</pre>`:""}</div>
+        <div class="detail"><div class="kv"><span>Agent</span><code>${esc(t.agent_label||t.agent)}</code><span>Branch</span><code>${esc(t.branch)}</code><span>Worktree</span><code>${esc(t.worktree)}</code>${t.check?`<span>Check</span><code>${esc(t.check.command)}</code>`:""}${t.exit_code!=null?`<span>Exit</span><code>${esc(t.exit_code)}</code>`:""}</div>
+          ${t.prompt?`<pre>${esc(t.prompt)}</pre>`:""}
+          ${cms.length?`<ul class="clist" style="margin-top:8px">${cms.map(cm=>`<li data-diff-task="${esc(t.id)}" data-diff-sha="${esc(cm.sha)}"><span class="sha">${esc(cm.short)}</span><span class="subj">${esc(cm.subject)}</span>${delta(cm)}</li>`).join("")}</ul>`:""}
+          ${t.files?.length?`<ul class="files">${t.files.map(f=>`<li class="${esc(f.status)}"><b>${esc(f.status)}</b>${esc(f.path)}</li>`).join("")}</ul>`:""}
+          <div style="display:flex;gap:8px;margin-top:10px">${t.started_at?`<button class="btn" data-diff-task="${esc(t.id)}">View all changes</button>`:""}${CFG.actions&&(t.state==="running"||t.state==="pending")&&!s.finished?`<button class="btn danger" data-stop="${esc(t.id)}">${t.state==="running"?"Stop":"Skip"}</button>`:""}</div>
+          ${t.output?.length?`<pre>${esc(t.output.join("\n"))}</pre>`:""}</div>
       </div>`}).join("")||`<div class="empty-col">—</div>`}</div>`}).join("");
 
-  const evs=(s.recent||[]).slice().reverse().map(l=>{const m=l.match(/^\[([^\]]+)\]\s*(.*)$/);const t=m?new Date(m[1]):null;const msg=m?m[2]:l;
-    const cls=/ done /.test(msg)?"done":/ blocked |error|failed/.test(msg)?"blocked":/ start /.test(msg)?"start":/skipped/.test(msg)?"skipped":"";
-    return `<div class="ev ${cls}"><time>${t?t.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}):""}</time><span class="mk"></span><span class="msg">${esc(msg)}</span></div>`}).join("");
+  const history=allCommits.map(cm=>`<div class="hrow" data-diff-task="${esc(cm.task.id)}" data-diff-sha="${esc(cm.sha)}" style="--accent:${ownerInfo[cm.task.owner].accent}"><time>${clock(cm.time)}</time><span class="who"><i></i>${esc(cm.task.owner)}</span><code class="tid">${esc(cm.task.id)} · ${esc(cm.short)}</code><span class="subj">${esc(cm.subject)}</span>${delta(cm)}</div>`).join("");
 
-  document.getElementById("app").innerHTML=summary+
+  const evs=(s.recent||[]).slice().reverse().map(l=>{const m=l.match(/^\[([^\]]+)\]\s*(.*)$/);const msg=m?m[2]:l;
+    const cls=/ done /.test(msg)?"done":/ blocked |error|failed/.test(msg)?"blocked":/ start | retry /.test(msg)?"start":/skipped/.test(msg)?"skipped":"";
+    return `<div class="ev ${cls}"><time>${m?clock(m[1]):""}</time><span class="mk"></span><span class="msg">${esc(msg)}</span></div>`}).join("");
+
+  document.getElementById("app").innerHTML=plan+summary+
     `<h2>Agents <span class="count">${owners.length}</span></h2><section class="agents">${agents}</section>`+
     `<h2>Tasks <span class="count">${tasks.length}</span></h2><section class="board">${board}</section>`+
+    `<h2>Commit history <span class="count">${allCommits.length}</span></h2><section class="card history">${history||'<div class="ev"><span></span><span></span><span class="msg">No commits yet.</span></div>'}</section>`+
     `<h2>Activity</h2><section class="card events">${evs||'<div class="ev"><span></span><span></span><span class="msg">No events yet.</span></div>'}</section>`;
 
   document.querySelectorAll(".term[data-owner]").forEach(el=>{const p=scroll[el.dataset.owner];el.scrollTop=!p||p.stick?el.scrollHeight:p.top});
 }
 
-document.addEventListener("click",e=>{const t=e.target.closest(".task");if(!t||e.target.closest(".detail"))return;const id=t.dataset.id;open.has(id)?open.delete(id):open.add(id);t.classList.toggle("open")});
+const box=document.getElementById("diffbox");
+async function showDiff(task,sha){
+  document.getElementById("difftitle").textContent=sha?`${task} · commit ${sha.slice(0,7)}`:`${task} · all changes`;
+  const body=document.getElementById("diffbody");body.textContent="Loading…";box.showModal();
+  try{
+    const r=await fetch(`/api/diff?task=${encodeURIComponent(task)}${sha?`&sha=${encodeURIComponent(sha)}`:""}`,{cache:"no-store"});
+    const text=await r.text();
+    body.innerHTML=text.split("\n").map(l=>{const cls=l.startsWith("+++")||l.startsWith("---")||l.startsWith("diff ")||l.startsWith("commit ")?"meta":l.startsWith("+")?"add":l.startsWith("-")?"del":l.startsWith("@@")?"hunk":"";return cls?`<span class="${cls}">${esc(l)}</span>`:esc(l)}).join("\n");
+  }catch{body.textContent="Could not load the diff."}
+}
+document.getElementById("diffclose").addEventListener("click",()=>box.close());
+box.addEventListener("click",e=>{if(e.target===box)box.close()});
+
+async function act(path,body){
+  try{await fetch(path,{method:"POST",headers:{"content-type":"application/json","x-maw-token":CFG.token},body:JSON.stringify(body||{})})}catch{}
+  tick();
+}
+
+document.addEventListener("click",e=>{
+  const stop=e.target.closest("[data-stop]");if(stop){e.stopPropagation();act("/api/stop",{id:stop.dataset.stop});return}
+  if(e.target.closest("[data-stop-all]")){act("/api/stop-all");return}
+  const d=e.target.closest("[data-diff-task]");if(d){e.stopPropagation();showDiff(d.dataset.diffTask,d.dataset.diffSha);return}
+  const t=e.target.closest(".task");if(!t||e.target.closest(".detail"))return;const id=t.dataset.id;open.has(id)?open.delete(id):open.add(id);t.classList.toggle("open");
+});
 
 async function tick(){
   try{const r=await fetch("/status.json",{cache:"no-store"});const s=await r.json();offline=false;
     if(s.error){document.getElementById("app").innerHTML=`<div class="banner card"><b>No run yet</b>${esc(s.error)}</div>`;return}
-    last=s;if(!String(getSelection()).length)render(s)}
+    last=s;if(!String(getSelection()).length&&!box.open)render(s)}
   catch{offline=true;if(last)render(last)}
 }
 tick();setInterval(tick,1500);

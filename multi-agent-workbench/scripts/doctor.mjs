@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { AGENTS } from "./agents.mjs";
-import { loadTasks } from "./tasks.mjs";
+import { loadPlan } from "./tasks.mjs";
 
 /**
  * Check that each agent CLI is installed and logged in. Never prints CLI output,
@@ -12,17 +12,19 @@ import { loadTasks } from "./tasks.mjs";
 export async function doctor({ root = process.cwd(), taskPath, json = false } = {}) {
   const path = resolve(root, taskPath || "tasks.json");
   let required = Object.keys(AGENTS);
+  let registry = AGENTS;
   let scope = "all supported agents (no tasks.json found)";
   if (existsSync(path)) {
-    const tasks = await loadTasks(path, resolve(root));
-    required = [...new Set(tasks.map(t => t.agent))];
+    const plan = await loadPlan(path, resolve(root));
+    registry = plan.registry;
+    required = [...new Set(plan.tasks.map(t => t.agent))];
     scope = `agents used in ${path}`;
   }
   if (!json) console.log(`Checking ${scope}:`);
   let ready = true;
   const agents = [];
   for (const key of required) {
-    const def = AGENTS[key];
+    const def = registry[key];
     const bin = def.bin();
     const probe = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 15000 });
     if (probe.error) {
@@ -41,7 +43,7 @@ export async function doctor({ root = process.cwd(), taskPath, json = false } = 
     if (auth.error || auth.status !== 0) {
       ready = false;
       agents.push({ agent: key, label: def.label, binary: bin, installed: true, logged_in: false, status: "logged_out" });
-      if (!json) console.log(`✗ ${key} (${def.label}) — installed but not logged in. Run \`${bin} ${key === "claude" ? "auth login" : "login"}\`.`);
+      if (!json) console.log(`✗ ${key} (${def.label}) — installed but not logged in. Run \`${def.login}\`.`);
     } else {
       agents.push({ agent: key, label: def.label, binary: bin, installed: true, logged_in: true, status: "ready" });
       if (!json) console.log(`✓ ${key} (${def.label}) — installed and logged in`);
