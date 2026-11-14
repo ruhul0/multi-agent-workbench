@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Workbench</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23111318'/%3E%3Ccircle cx='11' cy='12' r='4' fill='%23e8875f'/%3E%3Ccircle cx='21' cy='12' r='4' fill='%2334c39a'/%3E%3Ccircle cx='16' cy='21' r='4' fill='%23748ffc'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0b0c0f;--bg2:#111318;--panel:#15171d;--panel2:#1b1e25;--line:#262a33;--line2:#323743;
+  --fg:#e9ebef;--fg2:#b4b9c4;--muted:#7d8391;--term:#0d0f13;--termfg:#c9d1d9;
+  --done:#3fcf8e;--run:#5aa9ff;--bad:#ff6b6b;--skip:#c9a227;--wait:#7d8391;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.25);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){:root{
+  --bg:#f4f5f7;--bg2:#eceef2;--panel:#ffffff;--panel2:#f7f8fa;--line:#e3e6eb;--line2:#d5d9e0;
+  --fg:#15181e;--fg2:#3d4350;--muted:#6b7280;--term:#0f1115;--termfg:#d0d6de;
+  --done:#12a067;--run:#2f7de1;--bad:#d93f3f;--skip:#a37f00;--wait:#8a909c;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 6px 16px rgba(16,24,40,.06);
+}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:0 20px 48px}
+code,.mono{font-family:var(--mono);font-size:12px}
+
+/* header */
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.bar{max-width:1320px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:-.01em;font-size:15px}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center}
+.project{color:var(--muted);font-weight:500}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid var(--line2);background:var(--panel)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.live .dot{animation:pulse 1.6s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 60%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+.meta{color:var(--muted);font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap}
+.meta b{color:var(--fg2);font-weight:600}
+
+/* summary */
+.summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;margin:22px 0 8px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.stat{padding:16px 18px;min-width:0}
+.stat .k{color:var(--muted);font-size:12px;font-weight:550;text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-size:28px;font-weight:680;letter-spacing:-.02em;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:14px;color:var(--muted);font-weight:500}
+.progress{height:8px;border-radius:99px;background:var(--bg2);overflow:hidden;display:flex;margin-top:12px;gap:2px}
+.progress span{height:100%;transition:flex-grow .5s ease}
+.legend{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:650;margin:30px 0 12px;display:flex;align-items:center;gap:10px}
+h2 .count{background:var(--panel2);border:1px solid var(--line);color:var(--fg2);border-radius:99px;padding:0 8px;font-size:11px;letter-spacing:0}
+
+/* agents */
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:14px}
+.agent{overflow:hidden;display:flex;flex-direction:column;position:relative}
+.agent::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--accent)}
+.agent.working::before{background:linear-gradient(90deg,var(--accent),transparent,var(--accent));background-size:200% 100%;animation:sweep 2s linear infinite}
+@keyframes sweep{to{background-position:-200% 0}}
+.ahead{display:flex;align-items:center;gap:12px;padding:16px 16px 12px}
+.avatar{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:750;font-size:15px;color:#fff;background:var(--accent);flex:none;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 35%,transparent)}
+.aname{font-weight:650;font-size:15px}
+.akind{color:var(--muted);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;padding:3px 9px;border-radius:99px;text-transform:capitalize;white-space:nowrap}
+.s-done{color:var(--done);background:color-mix(in srgb,var(--done) 13%,transparent)}
+.s-running,.s-working{color:var(--run);background:color-mix(in srgb,var(--run) 13%,transparent)}
+.s-blocked{color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent)}
+.s-skipped{color:var(--skip);background:color-mix(in srgb,var(--skip) 13%,transparent)}
+.s-pending,.s-idle{color:var(--wait);background:color-mix(in srgb,var(--wait) 14%,transparent)}
+.s-running .dot,.s-working .dot{animation:pulse 1.6s ease-out infinite}
+.current{padding:0 16px 12px}
+.current .title{font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.current .sub{color:var(--muted);font-size:12px;display:flex;gap:12px;flex-wrap:wrap;margin-top:2px}
+.queue{display:flex;gap:4px;padding:0 16px 14px;flex-wrap:wrap}
+.queue span{height:6px;flex:1;min-width:14px;border-radius:99px;background:var(--line2)}
+.queue .done{background:var(--done)}.queue .running{background:var(--run)}.queue .blocked{background:var(--bad)}.queue .skipped{background:var(--skip)}
+.term{background:var(--term);color:var(--termfg);font-family:var(--mono);font-size:12px;line-height:1.55;padding:12px 14px;min-height:120px;max-height:240px;overflow:auto;border-top:1px solid var(--line);white-space:pre-wrap;word-break:break-word;margin-top:auto}
+.term .empty{color:#6b7280;font-style:italic}
+.term::-webkit-scrollbar,.events::-webkit-scrollbar{width:8px}.term::-webkit-scrollbar-thumb,.events::-webkit-scrollbar-thumb{background:#2b3039;border-radius:8px}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start}
+.col{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:120px}
+.colhead{display:flex;align-items:center;gap:8px;padding:4px 6px 10px;font-weight:650;font-size:12.5px;color:var(--fg2)}
+.colhead .n{margin-left:auto;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+.task{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,transform .15s;box-shadow:var(--shadow)}
+.task:hover{border-color:var(--line2);transform:translateY(-1px)}
+.task .top{display:flex;align-items:center;gap:8px}
+.task .id{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.task .owner{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--fg2)}
+.task .owner i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.task .name{font-weight:600;margin:6px 0 4px;line-height:1.35}
+.task .info{display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:11.5px}
+.tag{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:0 6px;background:var(--panel2)}
+.tag.ok{color:var(--done)}.tag.no{color:var(--bad)}
+.reason{margin-top:6px;font-size:12px;color:var(--fg2);border-left:2px solid var(--line2);padding-left:8px}
+.task.running{border-color:color-mix(in srgb,var(--run) 45%,var(--line))}
+.empty-col{color:var(--muted);font-size:12px;text-align:center;padding:16px 0}
+
+/* drawer */
+.detail{display:none;margin-top:10px;border-top:1px dashed var(--line2);padding-top:10px}
+.task.open .detail{display:block}
+.detail .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px;color:var(--fg2)}
+.detail .kv span:nth-child(odd){color:var(--muted)}
+.detail pre{background:var(--term);color:var(--termfg);border-radius:8px;padding:10px;font-size:11.5px;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:8px 0 0}
+
+/* events */
+.events{max-height:320px;overflow:auto;padding:6px 0}
+.ev{display:grid;grid-template-columns:86px 18px 1fr;gap:8px;padding:6px 16px;align-items:start;font-size:13px}
+.ev:hover{background:var(--panel2)}
+.ev time{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding-top:2px}
+.ev .mk{width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--wait)}
+.ev.done .mk{background:var(--done)}.ev.blocked .mk{background:var(--bad)}.ev.start .mk{background:var(--run)}.ev.skipped .mk{background:var(--skip)}
+.ev .msg{color:var(--fg2);word-break:break-word}
+
+.banner{margin-top:22px;padding:28px;text-align:center;color:var(--muted)}
+.banner b{display:block;color:var(--fg);font-size:16px;margin-bottom:4px}
+
+@media (max-width:1100px){.board{grid-template-columns:repeat(3,minmax(0,1fr))}.summary{grid-template-columns:1fr}}
+@media (max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat .v{font-size:24px}.wrap,.bar{padding-left:16px;padding-right:16px}.board{grid-template-columns:1fr}.agents{grid-template-columns:1fr}.meta{width:100%}.ev{grid-template-columns:70px 14px 1fr;padding:6px 12px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <div class="brand"><div class="logo"><svg width="16" height="16" viewBox="0 0 32 32"><circle cx="10" cy="11" r="5" fill="#e8875f"/><circle cx="22" cy="11" r="5" fill="#34c39a"/><circle cx="16" cy="22" r="5" fill="#748ffc"/></svg></div>Agent Workbench <span class="project" id="project"></span></div>
+  <div class="spacer"></div>
+  <div class="meta" id="meta"></div>
+  <div class="pill" id="runpill"><span class="dot"></span><span>Connecting…</span></div>
+</div></header>
+
+<div class="wrap" id="app"><div class="banner card"><b>Waiting for the supervisor…</b>Status appears here as soon as <code>maw</code> starts.</div></div>
+
+<script>
+const PALETTE={claude:"#e8875f",codex:"#22b38a",chatgpt:"#22b38a",openai:"#22b38a",agy:"#748ffc",antigravity:"#748ffc"};
+const EXTRA=["#e5a50a","#c061cb","#26a7c9","#f05d8c","#8bb33a"];
+const KIND={claude:"Claude Code",codex:"Codex CLI",agy:"Antigravity CLI"};
+const COLS=[["pending","Queued"],["running","Running"],["done","Done"],["blocked","Blocked"],["skipped","Skipped"]];
+const COLOR={done:"var(--done)",running:"var(--run)",blocked:"var(--bad)",skipped:"var(--skip)",pending:"var(--line2)"};
+const open=new Set();let last=null,offline=false;
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const accent=(owner,agent,i)=>PALETTE[String(owner).toLowerCase()]||PALETTE[agent]||EXTRA[i%EXTRA.length];
+function dur(a,b){if(!a)return"";const s=Math.max(0,Math.round(((b?new Date(b):new Date())-new Date(a))/1000));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?`${h}h ${m}m`:m?`${m}m ${String(x).padStart(2,"0")}s`:`${x}s`}
+function ago(t){const s=Math.round((Date.now()-new Date(t))/1000);return s<5?"just now":s<60?`${s}s ago`:s<3600?`${Math.floor(s/60)}m ago`:`${Math.floor(s/3600)}h ago`}
+const chip=st=>`<span class="chip s-${esc(st)}"><span class="dot"></span>${esc(st==="working"?"running":st)}</span>`;
+
+function render(s){
+  const tasks=s.tasks||[],owners=[...new Set(tasks.map(t=>t.owner))];
+  const ownerInfo=Object.fromEntries(owners.map((o,i)=>{const t=tasks.find(x=>x.owner===o);return[o,{accent:accent(o,t.agent,i),agent:t.agent}]}));
+  const c={pending:0,running:0,done:0,blocked:0,skipped:0};tasks.forEach(t=>c[t.state]=(c[t.state]||0)+1);
+  const failed=c.blocked+c.skipped>0;
+  document.getElementById("project").textContent="· "+String(s.root||"").split("/").filter(Boolean).pop();
+  const pill=document.getElementById("runpill");
+  const pstate=offline?["Disconnected","var(--muted)",false]:!s.finished?["Running","var(--run)",true]:failed?["Finished with issues","var(--bad)",false]:["All tasks done","var(--done)",false];
+  pill.className="pill"+(pstate[2]?" live":"");pill.style.color=pstate[1];pill.innerHTML=`<span class="dot"></span><span>${pstate[0]}</span>`;
+  const endT=s.finished?s.updated_at:null;
+  document.getElementById("meta").innerHTML=`<span>Elapsed <b>${dur(s.started_at,endT)}</b></span><span>Updated <b>${ago(s.updated_at)}</b></span>`;
+
+  // remember scroll state of terminals
+  const scroll={};document.querySelectorAll(".term[data-owner]").forEach(el=>{scroll[el.dataset.owner]={top:el.scrollTop,stick:el.scrollTop+el.clientHeight>=el.scrollHeight-8}});
+
+  const total=tasks.length||1;
+  const summary=`<section class="summary">
+    <div class="card stat"><div class="k">Progress</div><div class="v">${c.done}<small> / ${tasks.length} tasks done</small></div>
+      <div class="progress">${["done","running","blocked","skipped","pending"].filter(k=>c[k]).map(k=>`<span style="flex-grow:${c[k]/total};background:${COLOR[k]}"></span>`).join("")}</div>
+      <div class="legend">${["done","running","blocked","skipped","pending"].map(k=>`<span><i style="background:${COLOR[k]}"></i>${c[k]} ${k}</span>`).join("")}</div></div>
+    <div class="stats"><div class="card stat"><div class="k">Agents</div><div class="v">${owners.length}</div><div class="akind">${Object.values(s.agents||{}).filter(a=>a.state==="working").length} active now</div></div>
+    <div class="card stat"><div class="k">Running</div><div class="v" style="color:var(--run)">${c.running}</div></div>
+    <div class="card stat"><div class="k">Commits</div><div class="v">${tasks.reduce((n,t)=>n+(t.commits?.length||0),0)}</div></div>
+    <div class="card stat"><div class="k">Blocked</div><div class="v" style="color:${c.blocked?"var(--bad)":"inherit"}">${c.blocked}</div></div></div>
+  </section>`;
+
+  const agents=owners.map(o=>{
+    const a=(s.agents||{})[o],info=ownerInfo[o],mine=tasks.filter(t=>t.owner===o);
+    const cur=a?tasks.find(t=>t.id===a.task_id):mine.find(t=>t.state==="pending");
+    const st=a?a.state:"idle";
+    const out=(a?.output||[]).join("\n");
+    const sub=cur?[`<code>${esc(cur.id)}</code>`,cur.branch&&`<span>⎇ ${esc(cur.branch)}</span>`,cur.started_at&&`<span>⏱ ${dur(cur.started_at,cur.finished_at)}</span>`,a?.commit&&`<code>${esc(a.commit)}</code>`].filter(Boolean).join(""):"";
+    return `<article class="card agent ${esc(st)}" style="--accent:${info.accent}">
+      <div class="ahead"><div class="avatar">${esc(o[0]?.toUpperCase())}</div>
+        <div style="min-width:0"><div class="aname">${esc(o)}</div><div class="akind">${esc(KIND[info.agent]||info.agent)} · ${mine.filter(t=>t.state==="done").length}/${mine.length} done</div></div>
+        <div class="spacer"></div>${chip(st)}</div>
+      <div class="current"><div class="title">${cur?esc(cur.task||cur.id):"No tasks"}</div><div class="sub">${sub}</div></div>
+      <div class="queue">${mine.map(t=>`<span class="${esc(t.state)}" title="${esc(t.id)} · ${esc(t.state)}"></span>`).join("")}</div>
+      <div class="term" data-owner="${esc(o)}">${out?esc(out):`<span class="empty">${st==="idle"?"Waiting for its turn…":"No output yet…"}</span>`}</div>
+    </article>`}).join("");
+
+  const board=COLS.map(([k,label])=>{const list=tasks.filter(t=>t.state===k);
+    return `<div class="col"><div class="colhead"><span class="dot" style="color:${COLOR[k]}"></span>${label}<span class="n">${list.length}</span></div>
+    ${list.map(t=>{const info=ownerInfo[t.owner];const chk=t.check&&t.check.passed!=null?`<span class="tag ${t.check.passed?"ok":"no"}">${t.check.passed?"✓":"✕"} check</span>`:t.check?`<span class="tag">check</span>`:"";
+      return `<div class="task ${esc(t.state)} ${open.has(t.id)?"open":""}" data-id="${esc(t.id)}" style="--accent:${info.accent}">
+        <div class="top"><span class="id">${esc(t.id)}</span><span class="owner"><i></i>${esc(t.owner)}</span></div>
+        <div class="name">${esc(t.task||t.id)}</div>
+        <div class="info">${t.commit?`<span class="tag mono">${esc(t.commit.slice(0,7))}</span>`:""}${chk}${t.started_at?`<span>⏱ ${dur(t.started_at,t.finished_at)}</span>`:""}${t.depends_on?.length?`<span>after ${esc(t.depends_on.join(", "))}</span>`:""}${t.dirty?`<span class="tag no">uncommitted</span>`:""}</div>
+        ${t.reason?`<div class="reason">${esc(t.reason)}</div>`:""}
+        <div class="detail"><div class="kv"><span>Branch</span><code>${esc(t.branch)}</code><span>Worktree</span><code>${esc(t.worktree)}</code>${t.check?`<span>Check</span><code>${esc(t.check.command)}</code>`:""}${t.exit_code!=null?`<span>Exit</span><code>${esc(t.exit_code)}</code>`:""}</div>
+          ${t.commits?.length?`<pre>${esc(t.commits.join("\n"))}</pre>`:""}${t.output?.length?`<pre>${esc(t.output.join("\n"))}</pre>`:""}</div>
+      </div>`}).join("")||`<div class="empty-col">—</div>`}</div>`}).join("");
+
+  const evs=(s.recent||[]).slice().reverse().map(l=>{const m=l.match(/^\[([^\]]+)\]\s*(.*)$/);const t=m?new Date(m[1]):null;const msg=m?m[2]:l;
+    const cls=/ done /.test(msg)?"done":/ blocked |error|failed/.test(msg)?"blocked":/ start /.test(msg)?"start":/skipped/.test(msg)?"skipped":"";
+    return `<div class="ev ${cls}"><time>${t?t.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}):""}</time><span class="mk"></span><span class="msg">${esc(msg)}</span></div>`}).join("");
+
+  document.getElementById("app").innerHTML=summary+
+    `<h2>Agents <span class="count">${owners.length}</span></h2><section class="agents">${agents}</section>`+
+    `<h2>Tasks <span class="count">${tasks.length}</span></h2><section class="board">${board}</section>`+
+    `<h2>Activity</h2><section class="card events">${evs||'<div class="ev"><span></span><span></span><span class="msg">No events yet.</span></div>'}</section>`;
+
+  document.querySelectorAll(".term[data-owner]").forEach(el=>{const p=scroll[el.dataset.owner];el.scrollTop=!p||p.stick?el.scrollHeight:p.top});
+}
+
+document.addEventListener("click",e=>{const t=e.target.closest(".task");if(!t||e.target.closest(".detail"))return;const id=t.dataset.id;open.has(id)?open.delete(id):open.add(id);t.classList.toggle("open")});
+
+async function tick(){
+  try{const r=await fetch("/status.json",{cache:"no-store"});const s=await r.json();offline=false;
+    if(s.error){document.getElementById("app").innerHTML=`<div class="banner card"><b>No run yet</b>${esc(s.error)}</div>`;return}
+    last=s;if(!String(getSelection()).length)render(s)}
+  catch{offline=true;if(last)render(last)}
+}
+tick();setInterval(tick,1500);
+</script>
+</body>
+</html>
