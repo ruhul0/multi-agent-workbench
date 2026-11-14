@@ -6,7 +6,20 @@ import process from "node:process";
 const root = process.env.WORKBENCH_ROOT || process.cwd();
 const dir = `${root}/.agent-workbench`;
 await mkdir(dir, { recursive: true });
-const tasks = JSON.parse(await readFile(process.env.WORKBENCH_TASKS || `${root}/tasks.json`, "utf8"));
+const taskPath = process.env.WORKBENCH_TASKS || `${root}/tasks.json`;
+let tasks;
+try {
+  tasks = JSON.parse(await readFile(taskPath, "utf8"));
+} catch (error) {
+  console.error(`No tasks.json found at ${taskPath}. Create a task queue first; see the README example.`);
+  process.exitCode = 2;
+  process.exit();
+}
+if (!Array.isArray(tasks) || tasks.length === 0) {
+  console.error(`No tasks found in ${taskPath}. Add at least one Claude or Codex task.`);
+  process.exitCode = 2;
+  process.exit();
+}
 const statePath = `${dir}/status.json`, logPath = `${dir}/supervisor.log`;
 const state = { agents: {}, history: [], recent: [] };
 const save = () => writeFile(statePath, JSON.stringify({ ...state, updated_at: new Date().toISOString() }, null, 2));

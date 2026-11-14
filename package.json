@@ -1,21 +1,36 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run multiple coding-agent CLIs in parallel with task queues, isolated worktrees, handoffs, and live status.",
   "type": "module",
   "bin": {
     "multi-agent-workbench": "bin/maw.mjs",
     "maw": "bin/maw.mjs"
   },
-  "files": ["bin", "multi-agent-workbench", "README.md", "LICENSE"],
+  "files": [
+    "bin",
+    "multi-agent-workbench",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node bin/maw.mjs",
     "check": "node --check bin/maw.mjs && node --check multi-agent-workbench/scripts/supervisor.mjs",
     "pack:check": "npm pack --dry-run"
   },
-  "engines": {"node": ">=20"},
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT",
-  "repository": {"type": "git", "url": "https://github.com/ruhul0/multi-agent-workbench.git"},
-  "bugs": {"url": "https://github.com/ruhul0/multi-agent-workbench/issues"},
-  "homepage": "https://github.com/ruhul0/multi-agent-workbench#readme"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruhul0/multi-agent-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ruhul0/multi-agent-workbench/issues"
+  },
+  "homepage": "https://github.com/ruhul0/multi-agent-workbench#readme",
+  "dependencies": {
+    "multi-agent-workbench": "github:ruhul0/multi-agent-workbench"
+  }
 }
