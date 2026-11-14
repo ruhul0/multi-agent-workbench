@@ -9,7 +9,7 @@ import { loadTasks } from "./tasks.mjs";
  * so account details and tokens stay out of terminals and logs.
  * Returns true when every required agent is ready.
  */
-export async function doctor({ root = process.cwd(), taskPath } = {}) {
+export async function doctor({ root = process.cwd(), taskPath, json = false } = {}) {
   const path = resolve(root, taskPath || "tasks.json");
   let required = Object.keys(AGENTS);
   let scope = "all supported agents (no tasks.json found)";
@@ -18,29 +18,36 @@ export async function doctor({ root = process.cwd(), taskPath } = {}) {
     required = [...new Set(tasks.map(t => t.agent))];
     scope = `agents used in ${path}`;
   }
-  console.log(`Checking ${scope}:`);
+  if (!json) console.log(`Checking ${scope}:`);
   let ready = true;
+  const agents = [];
   for (const key of required) {
     const def = AGENTS[key];
     const bin = def.bin();
     const probe = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 15000 });
     if (probe.error) {
       ready = false;
-      console.log(`✗ ${key} (${def.label}) — ${probe.error.code === "ENOENT" ? `\`${bin}\` not found on PATH` : probe.error.message}`);
+      const reason = probe.error.code === "ENOENT" ? `\`${bin}\` not found on PATH` : probe.error.message;
+      agents.push({ agent: key, label: def.label, binary: bin, installed: false, logged_in: false, status: "missing", reason });
+      if (!json) console.log(`✗ ${key} (${def.label}) — ${reason}`);
       continue;
     }
     if (!def.auth) {
-      console.log(`! ${key} (${def.label}) — installed; login cannot be checked non-interactively. Run \`${bin}\` once to confirm you are signed in.`);
+      agents.push({ agent: key, label: def.label, binary: bin, installed: true, logged_in: null, status: "unknown", reason: "login cannot be checked non-interactively" });
+      if (!json) console.log(`! ${key} (${def.label}) — installed; login cannot be checked non-interactively. Run \`${bin}\` once to confirm you are signed in.`);
       continue;
     }
     const auth = spawnSync(bin, def.auth, { encoding: "utf8", timeout: 15000 });
     if (auth.error || auth.status !== 0) {
       ready = false;
-      console.log(`✗ ${key} (${def.label}) — installed but not logged in. Run \`${bin} ${key === "claude" ? "auth login" : "login"}\`.`);
+      agents.push({ agent: key, label: def.label, binary: bin, installed: true, logged_in: false, status: "logged_out" });
+      if (!json) console.log(`✗ ${key} (${def.label}) — installed but not logged in. Run \`${bin} ${key === "claude" ? "auth login" : "login"}\`.`);
     } else {
-      console.log(`✓ ${key} (${def.label}) — installed and logged in`);
+      agents.push({ agent: key, label: def.label, binary: bin, installed: true, logged_in: true, status: "ready" });
+      if (!json) console.log(`✓ ${key} (${def.label}) — installed and logged in`);
     }
   }
-  console.log(ready ? "\nAll required agents are ready." : "\nFix the agents marked ✗ before running tasks.");
+  if (json) console.log(JSON.stringify({ ready, scope, agents }, null, 2));
+  else console.log(ready ? "\nAll required agents are ready." : "\nFix the agents marked ✗ before running tasks.");
   return ready;
 }

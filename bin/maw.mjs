@@ -13,7 +13,7 @@ const HELP = `multi-agent-workbench (maw) — run Claude Code, Codex and Antigra
 
 Usage:
   maw init [--force]       Create a starter tasks.json in the current project
-  maw doctor               Check that the agents used in tasks.json are installed and logged in
+  maw doctor [--json]      Check that the agents used in tasks.json are installed and logged in
   maw run [--dry-run]      Run the task queue (default command) and open the live dashboard.
                            --dry-run validates and prints the plan
                            --no-open serves the dashboard without opening a browser
@@ -46,7 +46,7 @@ async function main() {
   }
   switch (command) {
     case "init": return init();
-    case "doctor": return (await doctor({ taskPath })) ? 0 : 1;
+    case "doctor": return (await doctor({ taskPath, json: flag("--json") })) ? 0 : 1;
     case "run": return run();
     case "status": return status();
     case "install-skill": return installSkill();

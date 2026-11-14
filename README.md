@@ -25,6 +25,7 @@ cd your-project
 maw init            # writes a starter tasks.json
 # edit tasks.json
 maw doctor          # are the agents installed and logged in?
+maw doctor --json   # machine-readable preflight for scripts and CI
 maw run --dry-run   # validate the plan
 maw                 # run it; the live dashboard opens in your browser
 ```
@@ -55,7 +56,7 @@ Full field reference: [`multi-agent-workbench/references/task-schema.md`](multi-
 | Command | What it does |
 |---|---|
 | `maw init [--force]` | Create a starter `tasks.json`. Won't overwrite without `--force`. |
-| `maw doctor` | Check the agents used in `tasks.json` (or all agents) are installed and logged in. Exits 1 if any are not. Never prints account details. |
+| `maw doctor [--json]` | Check the agents used in `tasks.json` (or all agents) are installed and logged in. Exits 1 if any are not. `--json` emits a script-friendly report. Never prints account details. |
 | `maw` / `maw run` | Run the queues and open the live dashboard. Exits 0 only if every task is done. `--dry-run` validates and prints the plan; `--no-open` serves the dashboard without opening a browser; `--no-dashboard` skips it. |
 | `maw status` | Summarize the last run. |
 | `maw dashboard [--port N]` | Open the status page on its own, e.g. to review a finished run. |
