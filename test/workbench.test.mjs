@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeTasks } from "../multi-agent-workbench/scripts/tasks.mjs";
-import { formatClaudeEvent, AGENTS } from "../multi-agent-workbench/scripts/agents.mjs";
+import { formatClaudeEvent, formatCodexEvent, parseCodexEvent, parseClaudeEvent, expandTemplate, AGENTS } from "../multi-agent-workbench/scripts/agents.mjs";
+import { dashboard } from "../multi-agent-workbench/scripts/dashboard.mjs";
+import { request } from "node:http";
 import { spawn } from "node:child_process";
 
 const MAW = fileURLToPath(new URL("../bin/maw.mjs", import.meta.url));
@@ -206,4 +208,188 @@ test("unknown flags are rejected instead of starting a run", async () => {
 test("codex prompts starting with a dash are passed after --", () => {
   const args = AGENTS.codex.args({ prompt: "-fix the build" });
   assert.deepEqual(args.slice(-2), ["--", "-fix the build"]);
+});
+
+// ---- 0.3 features ----
+
+async function script(base, name, body) {
+  const p = join(base, name);
+  await writeFile(p, `#!/bin/sh\n${body}\n`);
+  await chmod(p, 0o755);
+  return p;
+}
+
+test("a failed check is sent back to the agent and the retry can pass", async () => {
+  const { repo, base } = await setup([{ id: "L1", owner: "codex", prompt: "build it", check: "test -f fixed.txt", retries: 1 }]);
+  // First attempt commits nothing useful; when the prompt carries the check failure it fixes it.
+  const agent = await script(base, "learner.sh", `for a; do last="$a"; done
+case "$last" in *"acceptance check"*) echo ok > fixed.txt; git add -A; git commit -qm "fix: make check pass";; *) echo first > first.txt; git add -A; git commit -qm "first try";; esac`);
+  const r = maw(repo, agent);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const s = await statusOf(repo);
+  assert.equal(s.tasks[0].state, "done");
+  assert.equal(s.tasks[0].attempt, 2);
+  assert.equal(s.tasks[0].commits.length, 2);
+  assert.equal(s.tasks[0].commits[0].subject, "fix: make check pass");
+  assert.ok(s.tasks[0].files.some(f => f.path === "fixed.txt"));
+});
+
+test("isolated tasks run in their own worktrees and max_parallel limits concurrency", async () => {
+  const { repo, agent } = await setup({ max_parallel: 1, tasks: [
+    { id: "L1", owner: "claude", prompt: "iso one", isolate: true },
+    { id: "L2", owner: "claude", prompt: "iso two", isolate: true },
+  ] });
+  const r = maw(repo, agent);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const s = await statusOf(repo);
+  assert.notEqual(s.tasks[0].worktree, s.tasks[1].worktree);
+  assert.equal(s.tasks[0].branch, "maw/claude-L1");
+  // with max_parallel 1 the second task starts after the first finished
+  assert.ok(new Date(s.tasks[1].started_at) >= new Date(s.tasks[0].finished_at));
+});
+
+test("custom agents are defined with argv templates", async () => {
+  const { repo, agent } = await setup({
+    agents: { mybot: { bin: "mybot", args: ["--yolo", ["--model", "{model}"], "{prompt}"] } },
+    tasks: [{ id: "M1", owner: "mybot", prompt: "custom agent work" }],
+  });
+  const r = spawnSync(process.execPath, [MAW], { cwd: repo, encoding: "utf8", env: { ...process.env, MAW_NO_DASHBOARD: "1", MAW_BIN_MYBOT: agent } });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.equal((await statusOf(repo)).tasks[0].state, "done");
+  assert.deepEqual(expandTemplate(["--yolo", ["--model", "{model}"], "{prompt}"], { prompt: "p" }), ["--yolo", "p"]);
+});
+
+test("--resume keeps tasks finished in the previous run", async () => {
+  const { repo, agent } = await setup([
+    { id: "L1", owner: "claude", prompt: "first part" },
+    { id: "L2", owner: "claude", prompt: "second part FAIL" },
+  ]);
+  assert.equal(maw(repo, agent).status, 1);
+  const tasks = JSON.parse(await readFile(join(repo, "tasks.json"), "utf8"));
+  tasks[1].prompt = "second part fixed";
+  await writeFile(join(repo, "tasks.json"), JSON.stringify(tasks));
+  const r = maw(repo, agent, "--resume");
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const s = await statusOf(repo);
+  assert.equal(s.tasks[0].reason, "done in an earlier run");
+  assert.equal(s.tasks[1].state, "done");
+});
+
+test("validation: queue-order deadlocks, shared branches, bad fields", () => {
+  assert.throws(() => normalizeTasks([
+    { id: "A1", owner: "claude", prompt: "x", depends_on: ["B2"] }, { id: "A2", owner: "claude", prompt: "x" },
+    { id: "B1", owner: "codex", prompt: "x", depends_on: ["A2"] }, { id: "B2", owner: "codex", prompt: "x" },
+  ], "/r"), /cycle/);
+  assert.throws(() => normalizeTasks([{ id: "a", owner: "claude", prompt: "x", branch: "same" }, { id: "b", owner: "codex", prompt: "y", branch: "same" }], "/r"), /already checked out/);
+  assert.throws(() => normalizeTasks([{ id: "a", owner: "claude", prompt: "x", timeout_minutes: -1 }], "/r"), /positive/);
+  assert.throws(() => normalizeTasks([{ id: "a", owner: "claude", prompt: 42 }], "/r"), /non-empty string/);
+  assert.throws(() => normalizeTasks([{ id: "a b", owner: "claude", prompt: "x" }], "/r"), /"id" may only/);
+  assert.throws(() => normalizeTasks([{ id: "a", owner: "../evil", command: "claude", prompt: "x" }], "/r"), /"owner" may only/);
+});
+
+test("a second run in the same repository is refused while one is active", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "SLOW NOCOMMIT" }]);
+  const env = { ...process.env, MAW_NO_DASHBOARD: "1", MAW_BIN_CLAUDE: agent };
+  const first = spawn(process.execPath, [MAW], { cwd: repo, env, stdio: "ignore" });
+  const exited = new Promise(r => first.on("close", r));
+  await new Promise(r => setTimeout(r, 800));
+  const second = spawnSync(process.execPath, [MAW], { cwd: repo, env, encoding: "utf8" });
+  await exited;
+  assert.equal(second.status, 2);
+  assert.match(second.stderr, /already running/);
+});
+
+test("maw plan turns a plan file into validated tasks", async () => {
+  const { repo, base } = await setup([{ id: "x", owner: "claude", prompt: "x" }]);
+  await writeFile(join(repo, "PLAN.md"), "# Orders feature\nAdd an orders API and page.\n");
+  const answer = JSON.stringify({ plan: { title: "Orders", summary: "API then UI." }, tasks: [
+    { id: "L1", owner: "claude", task: "API", prompt: "Build the API. Run the relevant tests and commit your changes with a clear message." },
+    { id: "C1", owner: "codex", task: "UI", prompt: "Build the UI.", depends_on: ["L1"] },
+  ] });
+  const planner = await script(base, "planner.sh", `cat <<'JSON'\nHere is the plan:\n\`\`\`json\n${answer}\n\`\`\`\nJSON`);
+  const env = { ...process.env, MAW_BIN_CLAUDE: planner, MAW_BIN_CODEX: planner };
+  assert.equal(spawnSync(process.execPath, [MAW, "plan"], { cwd: repo, env, encoding: "utf8" }).status, 2, "refuses to overwrite tasks.json");
+  const r = spawnSync(process.execPath, [MAW, "plan", "--force", "--agents", "claude,codex"], { cwd: repo, env, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  const written = JSON.parse(await readFile(join(repo, "tasks.json"), "utf8"));
+  assert.equal(written.plan.title, "Orders");
+  assert.equal(written.plan.source, "PLAN.md");
+  assert.deepEqual(written.tasks.map(t => t.id), ["L1", "C1"]);
+});
+
+test("review, merge into an integration worktree, and clean", async () => {
+  const { repo, agent } = await setup([
+    { id: "L1", owner: "claude", prompt: "backend change" },
+    { id: "C1", owner: "codex", prompt: "frontend change" },
+    { id: "C2", owner: "codex", prompt: "broken FAIL" },
+  ]);
+  assert.equal(maw(repo, agent).status, 1);
+  const rev = JSON.parse(maw(repo, agent, "review", "--json").stdout);
+  assert.equal(rev.tasks.find(t => t.id === "L1").commits.length, 1);
+  const m = maw(repo, agent, "merge", "--check", "test -f backend_change.txt && test -f frontend_change.txt");
+  assert.equal(m.status, 0, m.stderr + m.stdout);
+  assert.match(m.stdout, /not merged: C2/);
+  const integration = join(repo, "..", "repo-integration");
+  const log = execFileSync("git", ["log", "--format=%s"], { cwd: integration, encoding: "utf8" });
+  assert.match(log, /Merge maw\/claude/);
+  assert.match(log, /Merge maw\/codex/);
+  const c = maw(repo, agent, "clean", "--branches", "--force");
+  assert.equal(c.status, 0, c.stderr + c.stdout);
+  assert.doesNotMatch(execFileSync("git", ["branch"], { cwd: repo, encoding: "utf8" }), /maw\//);
+});
+
+test("dashboard rejects foreign Host headers and cross-site actions, serves diffs", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "diff me" }]);
+  assert.equal(maw(repo, agent).status, 0);
+  const control = { stopTask: () => true };
+  const { server, url } = await dashboard({ root: repo, port: 40000 + Math.floor(Math.random() * 20000), control });
+  try {
+    const port = new URL(url).port;
+    const raw = (path, headers = {}, method = "GET") => new Promise((done, fail) => {
+      const req = request({ host: "127.0.0.1", port, path, method, headers }, (res) => { let b = ""; res.on("data", c => b += c); res.on("end", () => done({ status: res.statusCode, body: b })); });
+      req.on("error", fail); req.end();
+    });
+    assert.equal((await raw("/status.json", { host: `evil.example:${port}` })).status, 421);
+    assert.equal((await raw("/status.json")).status, 200);
+    assert.equal((await raw("/api/stop", {}, "POST")).status, 403);
+    const page = await raw("/");
+    const token = page.body.match(/"token":"([0-9a-f]+)"/)[1];
+    assert.equal((await raw("/api/stop", { "x-maw-token": token, "content-type": "application/json" }, "POST")).status, 200);
+    const sha = (await statusOf(repo)).tasks[0].commits[0].sha;
+    assert.match((await raw(`/api/diff?task=L1&sha=${sha}`)).body, /\+diff me/);
+    assert.match((await raw(`/api/diff?task=L1&sha=deadbeef`)).body, /does not belong/);
+  } finally {
+    server.close();
+  }
+});
+
+test("codex --json events become readable lines and usage", () => {
+  const ev = (o) => formatCodexEvent(JSON.stringify(o));
+  assert.deepEqual(ev({ type: "item.started", item: { type: "command_execution", command: "npm test" } }), ["▸ npm test"]);
+  assert.deepEqual(ev({ type: "item.completed", item: { type: "agent_message", text: "All done" } }), ["All done"]);
+  assert.deepEqual(ev({ type: "item.completed", item: { type: "file_change", changes: [{ path: "a.js", kind: "update" }] } }), ["▸ update a.js"]);
+  assert.deepEqual(ev({ type: "turn.failed", error: { message: "model not supported" } }), ["✕ model not supported"]);
+  assert.deepEqual(parseCodexEvent(JSON.stringify({ type: "thread.started", thread_id: "t1" })), { session_id: "t1" });
+  assert.equal(parseClaudeEvent(JSON.stringify({ type: "result", session_id: "s", total_cost_usd: 0.5, num_turns: 3 })).usage.cost_usd, 0.5);
+  const resumeArgs = AGENTS.codex.args({ prompt: "p" }, { prompt: "fix it", resume: "t1" });
+  assert.deepEqual([resumeArgs[0], resumeArgs[1], ...resumeArgs.slice(-3)], ["exec", "resume", "--", "t1", "fix it"]);
+});
+
+test("budget stops new tasks; env.allow keeps other variables away from agents", async () => {
+  const { repo, base } = await setup({ budget_usd: 0.5, env: { allow: [], set: { MAW_TEST_SET: "yes" } }, tasks: [
+    { id: "L1", owner: "claude", prompt: "spend" },
+    { id: "L2", owner: "claude", prompt: "never" },
+  ] });
+  const agent = await script(base, "spender.sh", `env > "$PWD/../agent-env.txt"
+echo '{"type":"result","subtype":"success","session_id":"s1","total_cost_usd":1.25,"num_turns":2}'`);
+  const r = spawnSync(process.execPath, [MAW], { cwd: repo, encoding: "utf8", env: { ...process.env, MAW_NO_DASHBOARD: "1", MAW_BIN_CLAUDE: agent, MAW_TEST_SECRET: "hidden" } });
+  assert.equal(r.status, 1, r.stderr + r.stdout);
+  const s = await statusOf(repo);
+  assert.equal(s.usage.cost_usd, 1.25);
+  assert.equal(s.tasks[1].state, "skipped");
+  assert.match(s.tasks[1].reason, /budget/);
+  const env = await readFile(join(base, "agent-env.txt"), "utf8");
+  assert.match(env, /MAW_TEST_SET=yes/);
+  assert.match(env, /MAW_TASK_ID=L1/);
+  assert.doesNotMatch(env, /MAW_TEST_SECRET/);
 });
