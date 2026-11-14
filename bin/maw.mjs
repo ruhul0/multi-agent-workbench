@@ -16,8 +16,9 @@ if (command === "--help" || command === "-h") {
 if (command === "init") {
   const target = resolve(process.cwd(), "tasks.json");
   await writeFile(target, JSON.stringify([
-    { id: "L1", owner: "claude", worktree: "../project-claude", task: "Backend task", prompt: "Implement the backend task and commit it." },
-    { id: "C1", owner: "codex", worktree: "../project-codex", task: "Frontend task", prompt: "Implement the frontend task and commit it." }
+    { id: "L1", owner: "claude", command: "claude", worktree: "../project-claude", task: "Backend task", prompt: "Implement the backend task and commit it." },
+    { id: "C1", owner: "codex", command: "codex", worktree: "../project-codex", task: "Frontend task", prompt: "Implement the frontend task and commit it." },
+    { id: "A1", owner: "antigravity", command: "agy", worktree: "../project-agy", task: "QA task", prompt: "Audit the current changes, fix only clear issues, and commit them." }
   ], null, 2) + "\n", { flag: "wx" });
   console.log(`Created ${target}. Edit it, then run maw.`);
   process.exit(0);

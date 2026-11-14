@@ -8,8 +8,9 @@ Create `tasks.json` in your project:
 
 ```json
 [
-  {"id":"L1","owner":"claude","worktree":"../project-claude","task":"API task","prompt":"Implement the API task and commit it."},
-  {"id":"C1","owner":"codex","worktree":"../project-codex","task":"Frontend task","prompt":"Implement the frontend task and commit it."}
+  {"id":"L1","owner":"claude","command":"claude","worktree":"../project-claude","task":"API task","prompt":"Implement the API task and commit it."},
+  {"id":"C1","owner":"codex","command":"codex","worktree":"../project-codex","task":"Frontend task","prompt":"Implement the frontend task and commit it."},
+  {"id":"A1","owner":"antigravity","command":"agy","worktree":"../project-agy","task":"QA task","prompt":"Audit the current changes, fix only clear issues, and commit them."}
 ]
 ```
 
