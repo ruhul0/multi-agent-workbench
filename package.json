@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Plan work, split it into micro-tasks, and run Claude Code, Codex, Antigravity or any agent CLI in parallel git worktrees with retries, review/merge and a live dashboard.",
   "type": "module",
   "bin": {
