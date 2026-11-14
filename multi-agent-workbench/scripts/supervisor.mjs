@@ -57,6 +57,13 @@ export async function runWorkbench({
     }).catch(() => {});
     return writeChain;
   };
+  // Persist live output at most once a second so the dashboard can follow along.
+  let saveTimer = null;
+  const saveSoon = () => {
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => { saveTimer = null; save(); }, 1000);
+    saveTimer.unref?.();
+  };
   const log = async (line) => {
     const s = `[${new Date().toISOString()}] ${line}`;
     state.recent = [...state.recent, s].slice(-40);
@@ -107,8 +114,8 @@ export async function runWorkbench({
       const def = AGENTS[t.agent];
       const taskLog = resolve(logDir, `${safeName(t.id)}.log`);
       const res = await run(def.bin(), def.args(t), t.worktree, {
-        prefix: `[${t.owner}] `, quiet, logFile: taskLog, timeoutMs: t.timeout_minutes * 60_000, children,
-        onLine: (line) => { r.output = [...r.output, line].slice(-OUTPUT_TAIL); state.agents[t.owner].output = r.output; },
+        prefix: `[${t.owner}] `, quiet, logFile: taskLog, timeoutMs: t.timeout_minutes * 60_000, children, format: def.format,
+        onLine: (line) => { r.output = [...r.output, line].slice(-OUTPUT_TAIL); state.agents[t.owner].output = r.output; saveSoon(); },
       });
       r.exit_code = res.code;
       const after = git(t.worktree, ["rev-parse", "HEAD"]).out;
@@ -176,6 +183,7 @@ export async function runWorkbench({
 
   process.off("SIGINT", onSignal);
   process.off("SIGTERM", onSignal);
+  clearTimeout(saveTimer);
   state.finished = true;
   const counts = state.tasks.reduce((a, r) => ({ ...a, [r.state]: (a[r.state] || 0) + 1 }), {});
   await log(`finished: ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}`);
@@ -209,7 +217,7 @@ function safeName(id) {
   return id.replace(/[^A-Za-z0-9._-]/g, "_");
 }
 
-function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, children, onLine, shell = false } = {}) {
+function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, children, onLine, format, shell = false } = {}) {
   return new Promise((done) => {
     let settled = false;
     const settle = (v) => { if (!settled) { settled = true; done(v); } };
@@ -233,7 +241,11 @@ function run(cmd, args, cwd, { prefix = "", quiet = false, logFile, timeoutMs, c
       pending[stream] = lines.pop();
       for (const line of lines) emit(line, stream);
     };
-    const emit = (line, stream) => {
+    const emit = (raw, stream) => {
+      const lines = format ? format(raw) : [raw];
+      for (const line of lines) emitLine(line, stream);
+    };
+    const emitLine = (line, stream) => {
       if (!quiet) (stream === "stderr" ? process.stderr : process.stdout).write(prefix + line + "\n");
       if (logFile) appendFile(logFile, line + "\n").catch(() => {});
       onLine?.(line);

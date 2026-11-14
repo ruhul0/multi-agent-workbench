@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { normalizeTasks } from "../multi-agent-workbench/scripts/tasks.mjs";
+import { formatClaudeEvent } from "../multi-agent-workbench/scripts/agents.mjs";
+import { spawn } from "node:child_process";
 
 const MAW = fileURLToPath(new URL("../bin/maw.mjs", import.meta.url));
 
@@ -19,6 +21,7 @@ for a; do
 done
 [ -n "$p" ] && last="$p"
 case "$last" in
+  *SLOW*) echo "working on it"; sleep 3; echo "done";;
   *FAIL*) echo "failing as asked" >&2; exit 1;;
   *NOCOMMIT*) echo "nothing to do"; exit 0;;
 esac
@@ -137,4 +140,29 @@ test("run serves the dashboard and exits when not attached to a terminal", async
   });
   assert.equal(r.status, 0, r.stderr + r.stdout);
   assert.match(r.stdout, /live dashboard at http:\/\/127\.0\.0\.1:\d+/);
+});
+
+test("agent output reaches status.json while the task is still running", async () => {
+  const { repo, agent } = await setup([{ id: "L1", owner: "claude", prompt: "SLOW NOCOMMIT" }]);
+  const child = spawn(process.execPath, [MAW], { cwd: repo, env: { ...process.env, MAW_NO_DASHBOARD: "1", MAW_BIN_CLAUDE: agent }, stdio: "ignore" });
+  const exited = new Promise(r => child.on("close", r));
+  let seen = false;
+  for (let i = 0; i < 25 && !seen; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    try {
+      const s = await statusOf(repo);
+      seen = s.tasks[0].state === "running" && s.tasks[0].output.includes("working on it");
+    } catch {}
+  }
+  await exited;
+  assert.ok(seen, "live output was not written to status.json during the run");
+});
+
+test("claude stream-json events become readable lines", () => {
+  const ev = (o) => formatClaudeEvent(JSON.stringify(o));
+  assert.deepEqual(ev({ type: "system", subtype: "init" }), []);
+  assert.deepEqual(ev({ type: "assistant", message: { content: [{ type: "text", text: "Plan:\nstep one" }, { type: "tool_use", name: "Bash", input: { command: "npm test" } }] } }), ["Plan:", "step one", "▸ Bash: npm test"]);
+  assert.deepEqual(ev({ type: "user", message: { content: [{ type: "tool_result", is_error: true, content: "boom\nmore" }] } }), ["  ✕ boom"]);
+  assert.deepEqual(ev({ type: "result", subtype: "success", num_turns: 4 }), ["✓ finished in 4 turns"]);
+  assert.deepEqual(formatClaudeEvent("plain text"), ["plain text"]);
 });
