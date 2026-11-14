@@ -1,3 +1,0 @@
-interface:
-  display_name: "Multi Agent Workbench"
-  short_description: "Split work into micro-tasks and run Claude, Codex and Antigravity in parallel worktrees"

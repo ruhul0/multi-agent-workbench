@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unpkg.com/multi-agent-workbench/tasks.schema.json",
+  "title": "multi-agent-workbench tasks.json",
+  "description": "Task queue for maw. Either an array of tasks or an object with \"tasks\" and run settings.",
+  "oneOf": [
+    { "type": "array", "items": { "$ref": "#/$defs/task" }, "minItems": 1 },
+    { "$ref": "#/$defs/plan" }
+  ],
+  "$defs": {
+    "name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+    "plan": {
+      "type": "object",
+      "required": ["tasks"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "plan": {
+          "type": "object",
+          "description": "Shown at the top of the dashboard.",
+          "properties": { "title": { "type": "string" }, "summary": { "type": "string" }, "source": { "type": "string", "description": "Plan file the tasks came from." } }
+        },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" }, "minItems": 1 },
+        "max_parallel": { "type": "integer", "minimum": 1, "description": "Most tasks running at once (default: no limit)." },
+        "budget_usd": { "type": "number", "exclusiveMinimum": 0, "description": "Stop starting new tasks once reported agent cost reaches this." },
+        "agents": {
+          "type": "object",
+          "description": "Custom agent CLIs. Keys are agent names usable as owner/command.",
+          "additionalProperties": { "$ref": "#/$defs/agent" }
+        },
+        "env": {
+          "type": "object",
+          "properties": {
+            "allow": { "type": "array", "items": { "type": "string" }, "description": "Only pass these variables (plus PATH, HOME, USER, SHELL, TERM, LANG, TMPDIR and similar) to agents and checks. Omit to pass everything." },
+            "set": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra variables for agents and checks." }
+          }
+        },
+        "sandbox": {
+          "type": "array", "items": { "type": "string" }, "minItems": 1,
+          "description": "Command prefix that wraps every agent and check, e.g. [\"docker\",\"run\",\"--rm\",\"-v\",\"{worktree}:{worktree}\",\"-w\",\"{worktree}\",\"my-image\"]. Placeholders: {worktree}, {id}, {owner}, {root}."
+        },
+        "notify": {
+          "type": "object",
+          "properties": {
+            "desktop": { "type": "boolean" },
+            "webhook": { "type": "string", "pattern": "^https?://", "description": "POSTed a JSON summary (with a Slack-compatible \"text\" field) when the run ends." }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "required": ["bin", "args"],
+      "properties": {
+        "label": { "type": "string" },
+        "bin": { "type": "string", "description": "Executable. Override at run time with MAW_BIN_<NAME>." },
+        "args": { "$ref": "#/$defs/argv", "description": "Must contain {prompt}. Nested arrays are optional groups, dropped when a placeholder in them is empty." },
+        "plan_args": { "$ref": "#/$defs/argv", "description": "Read-only invocation used by maw plan." },
+        "auth": { "type": ["array", "null"], "items": { "type": "string" }, "description": "Arguments for a non-interactive login check (exit 0 = logged in)." },
+        "login": { "type": "string", "description": "Command shown by maw doctor when not logged in." },
+        "aliases": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "argv": {
+      "type": "array",
+      "items": { "oneOf": [{ "type": "string" }, { "type": "array", "items": { "type": "string" } }] }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "prompt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/name" },
+        "prompt": { "type": "string", "minLength": 1, "description": "Exact instruction sent to the agent." },
+        "owner": { "$ref": "#/$defs/name", "description": "Queue name. Tasks with the same owner run one after another." },
+        "command": { "type": "string", "description": "Agent CLI: claude, codex (chatgpt, openai), agy (antigravity) or a custom agent. Defaults to owner." },
+        "task": { "type": "string", "description": "Short title for status and dashboard." },
+        "worktree": { "type": "string", "description": "Worktree path relative to the repository root. Default ../<repo>-<owner>." },
+        "branch": { "type": "string", "description": "Default maw/<owner> (maw/<owner>-<id> when isolated)." },
+        "base": { "type": "string", "default": "HEAD" },
+        "isolate": { "type": "boolean", "description": "Run in its own worktree and branch, in parallel with the owner's queue." },
+        "depends_on": { "type": "array", "items": { "type": "string" } },
+        "check": { "type": "string", "description": "Shell command that must exit 0 for the task to count as done." },
+        "check_timeout_minutes": { "type": "number", "exclusiveMinimum": 0, "default": 30 },
+        "retries": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0, "description": "Extra attempts; failures are sent back to the agent." },
+        "model": { "type": "string" },
+        "effort": { "type": "string" },
+        "timeout_minutes": { "type": "number", "exclusiveMinimum": 0, "default": 60 },
+        "max_cost_usd": { "type": "number", "exclusiveMinimum": 0, "description": "Per-task spend limit (enforced by Claude Code; other agents: no further retries once reached)." }
+      }
+    }
+  }
+}

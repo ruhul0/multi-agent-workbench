@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.2.5",
-  "description": "Run Claude Code, Codex and Antigravity CLIs in parallel git worktrees with task queues, dependencies, acceptance checks and a live status dashboard.",
+  "version": "0.3.0",
+  "description": "Plan work, split it into micro-tasks, and run Claude Code, Codex, Antigravity or any agent CLI in parallel git worktrees with retries, review/merge and a live dashboard.",
   "type": "module",
   "bin": {
     "multi-agent-workbench": "bin/maw.mjs",
@@ -9,14 +9,18 @@
   },
   "files": [
     "bin",
-    "multi-agent-workbench",
+    "skills",
+    "tasks.schema.json",
+    "examples",
+    ".claude-plugin",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
     "start": "node bin/maw.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check bin/maw.mjs && for f in multi-agent-workbench/scripts/*.mjs; do node --check $f || exit 1; done",
+    "check": "node --check bin/maw.mjs && for f in skills/multi-agent-workbench/scripts/*.mjs; do node --check $f || exit 1; done",
     "pack:check": "npm pack --dry-run"
   },
   "engines": {
@@ -32,13 +36,17 @@
   },
   "homepage": "https://github.com/ruhul0/multi-agent-workbench#readme",
   "keywords": [
-    "ai",
     "agents",
-    "claude",
-    "codex",
+    "ai",
     "antigravity",
-    "multi-agent",
+    "claude",
+    "claude-code-plugin",
+    "cli",
+    "codex",
+    "dashboard",
     "git-worktree",
-    "cli"
+    "multi-agent",
+    "task-queue",
+    "worktree"
   ]
 }

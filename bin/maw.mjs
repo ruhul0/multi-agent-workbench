@@ -6,11 +6,11 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { runWorkbench, findRepoRoot } from "../multi-agent-workbench/scripts/supervisor.mjs";
-import { doctor } from "../multi-agent-workbench/scripts/doctor.mjs";
-import { dashboard, openBrowser } from "../multi-agent-workbench/scripts/dashboard.mjs";
-import { planTasks } from "../multi-agent-workbench/scripts/plan.mjs";
-import { review, merge, clean } from "../multi-agent-workbench/scripts/review.mjs";
+import { runWorkbench, findRepoRoot } from "../skills/multi-agent-workbench/scripts/supervisor.mjs";
+import { doctor } from "../skills/multi-agent-workbench/scripts/doctor.mjs";
+import { dashboard, openBrowser } from "../skills/multi-agent-workbench/scripts/dashboard.mjs";
+import { planTasks } from "../skills/multi-agent-workbench/scripts/plan.mjs";
+import { review, merge, clean } from "../skills/multi-agent-workbench/scripts/review.mjs";
 
 const HELP = `multi-agent-workbench (maw) — plan work, split it into micro-tasks, and run Claude Code,
 Codex, Antigravity (or any agent CLI) in parallel git worktrees with a live dashboard
@@ -189,7 +189,7 @@ async function init() {
 }
 
 async function installSkill() {
-  const source = fileURLToPath(new URL("../multi-agent-workbench", import.meta.url));
+  const source = fileURLToPath(new URL("../skills/multi-agent-workbench", import.meta.url));
   const targets = [];
   if (!flag("claude")) targets.push(resolve(homedir(), ".codex/skills/multi-agent-workbench"));
   if (!flag("codex")) targets.push(resolve(homedir(), ".claude/skills/multi-agent-workbench"));

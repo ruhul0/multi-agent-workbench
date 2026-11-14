@@ -1,0 +1,10 @@
+{
+  "name": "multi-agent-workbench",
+  "version": "0.3.0",
+  "description": "Turn a plan into micro-tasks and run them in parallel across Claude Code, Codex, Antigravity or any agent CLI, each in its own git worktree, with retries, review/merge and a live dashboard of commits and diffs.",
+  "author": { "name": "ruhul0", "url": "https://github.com/ruhul0" },
+  "license": "MIT",
+  "homepage": "https://github.com/ruhul0/multi-agent-workbench#readme",
+  "repository": "https://github.com/ruhul0/multi-agent-workbench",
+  "keywords": ["multi-agent", "git-worktree", "codex", "antigravity", "parallel", "dashboard"]
+}
