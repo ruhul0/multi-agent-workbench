@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-workbench",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Run multiple coding-agent CLIs in parallel with task queues, isolated worktrees, handoffs, and live status.",
   "type": "module",
   "bin": {

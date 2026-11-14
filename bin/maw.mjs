@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -10,7 +11,21 @@ const supervisor = resolve(packageRoot, "multi-agent-workbench/scripts/superviso
 const command = process.argv[2];
 if (command === "--help" || command === "-h") {
   console.log("multi-agent-workbench — run Claude and Codex tasks in parallel");
-  console.log("\nCommands:\n  maw init    Create a starter tasks.json\n  maw         Run the task queue in the current project");
+  console.log("\nCommands:\n  maw init    Create a starter tasks.json\n  maw doctor Check agent CLIs and authentication\n  maw         Run the task queue in the current project");
+  process.exit(0);
+}
+if (command === "doctor") {
+  const checks = [
+    ["claude", ["auth", "status"]],
+    ["codex", ["login", "status"]],
+    ["agy", ["--help"]],
+  ];
+  for (const [name, args] of checks) {
+    const result = spawnSync(name, args, { encoding: "utf8", timeout: 10000 });
+    const installed = !result.error;
+    const output = `${result.stdout || ""}${result.stderr || ""}`.replace(/token[^\n]*/gi, "token [redacted]").trim();
+    console.log(`${installed ? "✓" : "✗"} ${name}${installed ? ` — ${output.split("\n")[0] || "available"}` : " — not installed"}`);
+  }
   process.exit(0);
 }
 if (command === "init") {

@@ -20,6 +20,7 @@ Install and run:
 npm install -g multi-agent-workbench
 multi-agent-workbench init
 # edit tasks.json for your project
+multi-agent-workbench doctor
 multi-agent-workbench
 # or without installing
 npx multi-agent-workbench init
