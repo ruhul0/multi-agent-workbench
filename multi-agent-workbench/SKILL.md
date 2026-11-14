@@ -16,3 +16,7 @@ Use this skill when a software task benefits from multiple coding-agent CLIs wor
 - Expose current state, task, commit, output, and completed history in a live status file/dashboard.
 
 See `references/task-schema.md` for handoff records and `scripts/supervisor.mjs` for the Node.js supervisor.
+
+## Invocation
+
+Install the skill by cloning this repository to `~/.codex/skills/multi-agent-workbench`, then invoke it explicitly with `$multi-agent-workbench`. Before assigning tasks, run `maw doctor` and stop for any missing or unauthenticated worker. Typical ownership is Codex for frontend, Claude for backend logic, and Antigravity for QA/review, but preserve the user's requested assignment.

@@ -28,3 +28,30 @@ npx multi-agent-workbench
 ```
 
 The supervisor reads `tasks.json` from the current project and writes `.agent-workbench/status.json` and `.agent-workbench/supervisor.log`. Review each commit before merging or deploying.
+
+## Use as a Codex skill
+
+Clone the repository into your Codex skills directory:
+
+```bash
+git clone https://github.com/ruhul0/multi-agent-workbench.git \
+  ~/.codex/skills/multi-agent-workbench
+```
+
+Then invoke it in a Codex task with:
+
+```text
+Use $multi-agent-workbench to split this project into micro-tasks, assign frontend work to Codex, backend work to Claude, QA to Antigravity, and report live progress.
+```
+
+The skill instructions are in `multi-agent-workbench/SKILL.md`. The Node.js CLI and the skill are independent: use the skill for planning/orchestration guidance, and use `maw` to launch workers.
+
+## Agent login check
+
+Before assigning work, run:
+
+```bash
+maw doctor
+```
+
+It checks whether `claude`, `codex`, and `agy` are available without printing credentials.
