@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Release workflow: publish with npm trusted publishing, with verbose npm logging and a trusted-only mode for manual runs. No changes to the package itself.
+
 ## 0.3.0
 
 ### New

@@ -7,6 +7,12 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      auth:
+        description: "trusted-only: use trusted publishing (OIDC) without the token fallback, to test or diagnose it"
+        type: choice
+        options: [trusted-then-token, trusted-only]
+        default: trusted-then-token
 permissions:
   contents: read
   id-token: write
@@ -28,9 +34,14 @@ jobs:
         run: |
           v=$(node -p 'require("./package.json").version')
           if npm view "multi-agent-workbench@$v" version >/dev/null 2>&1; then echo "$v is already on npm"; exit 1; fi
+      - name: Show tool versions
+        run: node --version && npm --version
       - run: npm run check
       - run: npm test
-      - run: npm publish --provenance --access public
+      # --loglevel verbose prints npm's trusted publishing (OIDC) steps, so a failed
+      # token exchange shows its reason instead of silently falling back to the token.
+      - run: npm publish --provenance --access public --loglevel verbose
         env:
           # Without this, setup-node leaves a placeholder token that breaks the publish.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # trusted-only runs get no token, so only trusted publishing can succeed.
+          NODE_AUTH_TOKEN: ${{ inputs.auth == 'trusted-only' && '' || secrets.NPM_TOKEN }}
