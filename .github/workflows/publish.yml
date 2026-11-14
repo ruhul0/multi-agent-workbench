@@ -44,4 +44,6 @@ jobs:
         env:
           # Without this, setup-node leaves a placeholder token that breaks the publish.
           # trusted-only runs get no token, so only trusted publishing can succeed.
-          NODE_AUTH_TOKEN: ${{ inputs.auth == 'trusted-only' && '' || secrets.NPM_TOKEN }}
+          # (Written this way round because '' is falsy in GitHub expressions:
+          # "cond && '' || token" would always pick the token.)
+          NODE_AUTH_TOKEN: ${{ inputs.auth != 'trusted-only' && secrets.NPM_TOKEN || '' }}
